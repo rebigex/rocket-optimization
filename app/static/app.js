@@ -789,14 +789,22 @@ const App = (() => {
         toast((await res.json()).detail || 'Could not build the report.');
         return;
       }
+      const format = res.headers.get('X-Report-Format') || 'pdf';
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       // Open it rather than only downloading — a report you cannot see is not
       // done. It is already written to outputs/reports/, so forcing a download
       // on top of this would just leave a second copy of the same document.
       window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      toast('Report opened — saved as outputs/reports/report.html');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      if (format === 'pdf') {
+        toast('Report opened — saved as outputs/reports/report.pdf');
+      } else {
+        // Rendering needs a Chromium-family browser; say so instead of
+        // quietly handing over a different file type than the one promised.
+        toast('No browser found to render a PDF — opened the HTML instead. '
+              + (res.headers.get('X-Report-Pdf-Error') || ''));
+      }
     } finally {
       button.disabled = false; button.textContent = 'Generate report';
     }

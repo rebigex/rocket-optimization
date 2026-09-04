@@ -7,3 +7,48 @@ edited without touching the logic that assembles the document.
 FONT_LINK = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">'
 
 CSS = '\n:root {\n  --ground:#f4f5f2; --surface:#ffffff; --surface-2:#fafbf8;\n  --ink:#12151a; --ink-2:#565c64; --ink-3:#868c94;\n  --rule:#dee0d9; --rule-2:#eceee7;\n  --steel:#1c5e9e; --steel-soft:#e7eff7;\n  --ember:#c9501e; --ember-soft:#fbeee6;\n  --good:#1a6b48; --good-soft:#e6f2ec;\n  --display:"Archivo","Helvetica Neue",Arial,sans-serif;\n  --body:"Source Serif 4",Georgia,"Times New Roman",serif;\n  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;\n}\n@media (prefers-color-scheme: dark) {\n  :root:not([data-theme="light"]) {\n    --ground:#101318; --surface:#181c22; --surface-2:#1d222a;\n    --ink:#eef0ed; --ink-2:#a0a7af; --ink-3:#767d86;\n    --rule:#272c34; --rule-2:#1f242b;\n    --steel:#5da2e4; --steel-soft:#14273a;\n    --ember:#e8804d; --ember-soft:#2d1d14;\n    --good:#4fb787; --good-soft:#12281d;\n  }\n}\n:root[data-theme="dark"] {\n  --ground:#101318; --surface:#181c22; --surface-2:#1d222a;\n  --ink:#eef0ed; --ink-2:#a0a7af; --ink-3:#767d86;\n  --rule:#272c34; --rule-2:#1f242b;\n  --steel:#5da2e4; --steel-soft:#14273a;\n  --ember:#e8804d; --ember-soft:#2d1d14;\n  --good:#4fb787; --good-soft:#12281d;\n}\n*{box-sizing:border-box}\nbody{\n  background:var(--ground); color:var(--ink); margin:0; padding:0 24px 96px;\n  font-family:var(--body); font-size:17px; line-height:1.62;\n  -webkit-font-smoothing:antialiased;\n}\n.wrap{max-width:1000px;margin:0 auto}\n.prose{max-width:66ch}\nh1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:-.018em}\nh1{font-size:clamp(2.1rem,5vw,3.05rem);font-weight:700;line-height:1.05}\nh2{font-size:1.42rem;font-weight:650;margin:0 0 .25em}\nh3{font-size:1rem;font-weight:650;margin:0 0 .35em}\np{margin:0 0 1.05em}\nstrong{font-weight:600}\n.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.16em;\n  text-transform:uppercase;color:var(--ink-3);margin:0 0 1.1em}\nheader{padding:74px 0 0}\n.byline{font-family:var(--display);font-size:.83rem;font-weight:500;\n  letter-spacing:.02em;color:var(--ink-3);margin:.85em 0 0}\n.lede{font-size:1.2rem;line-height:1.5;color:var(--ink-2);max-width:60ch;margin:1.05em 0 0}\nhr.rule{height:1px;background:var(--rule);border:0;margin:54px 0}\nsection{margin:52px 0 0}\nsection>h2+p,section>h2+.prose{margin-top:.85em}\n\n.verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));\n  gap:14px;margin:38px 0 0}\n.verdict{background:var(--surface);border:1px solid var(--rule);border-radius:3px;\n  padding:18px 20px;border-top:3px solid var(--rule)}\n.verdict.no{border-top-color:var(--ember)}\n.verdict.yes{border-top-color:var(--good)}\n.verdict .tag{font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;\n  text-transform:uppercase;display:block;margin-bottom:9px}\n.verdict.no .tag{color:var(--ember)}\n.verdict.yes .tag{color:var(--good)}\n.verdict .head{font-family:var(--display);font-size:1.16rem;font-weight:650;\n  letter-spacing:-.015em;display:block;margin-bottom:7px}\n.verdict p{margin:0;font-size:.95rem;color:var(--ink-2)}\n\n.scroll{overflow-x:auto;margin:26px 0 0;border:1px solid var(--rule);\n  border-radius:3px;background:var(--surface)}\ntable{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:.8rem}\nth{text-align:left;font-weight:600;font-size:.63rem;letter-spacing:.1em;\n  text-transform:uppercase;color:var(--ink-3);padding:12px 13px;\n  border-bottom:1px solid var(--rule);white-space:nowrap;vertical-align:bottom}\nth span{font-weight:400;display:block;letter-spacing:.04em}\ntd{padding:10px 13px;border-bottom:1px solid var(--rule-2);white-space:nowrap}\ntr:last-child td{border-bottom:0}\ntd.n,th.n{text-align:right;font-variant-numeric:tabular-nums}\ntd.strong{font-weight:600}\ntd.des{color:var(--ink-2)}\ntd.idx{color:var(--steel);font-weight:600}\ntd.cores{letter-spacing:-.01em}\ntr.pick td{background:var(--steel-soft)}\ncaption{caption-side:bottom;text-align:left;font-family:var(--display);\n  font-size:.79rem;color:var(--ink-3);padding:12px 13px;line-height:1.5}\n\nfigure{margin:30px 0 0}\nfigure img{width:100%;height:auto;display:block;border:1px solid var(--rule);\n  border-radius:3px;background:#fcfcfb}\nfigcaption{font-family:var(--display);font-size:.79rem;color:var(--ink-3);\n  margin-top:10px;line-height:1.5;max-width:72ch}\n\n.note{border-left:2px solid var(--ember);background:var(--ember-soft);\n  padding:16px 20px;margin:26px 0 0;border-radius:0 3px 3px 0}\n.note.steel{border-left-color:var(--steel);background:var(--steel-soft)}\n.note p{margin:0;font-size:.95rem}\n.note .lbl{font-family:var(--mono);font-size:.65rem;letter-spacing:.13em;\n  text-transform:uppercase;color:var(--ember);display:block;margin-bottom:7px;font-weight:600}\n.note.steel .lbl{color:var(--steel)}\n\ndl.spec{display:grid;grid-template-columns:auto 1fr;gap:7px 22px;margin:24px 0 0;\n  font-size:.9rem;max-width:640px}\ndl.spec dt{color:var(--ink-2);font-family:var(--display);font-size:.86rem}\ndl.spec dd{margin:0;font-family:var(--mono);font-size:.83rem;\n  font-variant-numeric:tabular-nums}\n\ncode{font-family:var(--mono);font-size:.85em;background:var(--rule-2);\n  padding:1px 5px;border-radius:2px}\n.eq{font-family:var(--mono);font-size:.86rem;background:var(--surface);\n  border:1px solid var(--rule);border-radius:3px;padding:14px 17px;margin:20px 0 0;\n  overflow-x:auto;line-height:1.7}\nfooter{margin-top:62px;padding-top:22px;border-top:1px solid var(--rule);\n  font-family:var(--mono);font-size:.73rem;color:var(--ink-3);line-height:1.8}\n'
+
+
+#: Rules that only matter on paper. A report is handed over as a PDF, and the
+#: screen stylesheet alone paginates badly: dark mode bleeds onto the page,
+#: figures straddle sheet boundaries, and a heading lands as the last line of
+#: one page with its table on the next.
+PRINT_CSS = """
+@media print {
+  /* Paper has no dark mode. Pin the light palette whatever the screen did. */
+  :root, :root[data-theme="dark"] {
+    --ground:#ffffff; --surface:#ffffff; --surface-2:#f8f9f6;
+    --ink:#12151a; --ink-2:#4a515a; --ink-3:#787f88;
+    --rule:#d5d8d0; --rule-2:#e8ebe4;
+    --steel:#1a5389; --steel-soft:#eef4fa;
+    --ember:#b04619; --ember-soft:#fdf1ea;
+    --good:#175f40; --good-soft:#eef6f1;
+  }
+  @page { margin: 14mm 13mm; }
+  body { background:#fff; padding:0; font-size:10.5pt; line-height:1.5 }
+  .wrap { max-width:none }
+  header { padding:0 }
+  h1 { font-size:25pt }
+  h2 { font-size:13.5pt; break-after:avoid }
+  h3 { break-after:avoid }
+  .lede { font-size:11.5pt }
+  .byline { font-size:9.5pt }
+  hr.rule { margin:20px 0 }
+  section { margin:24px 0 0 }
+  /* Keep the small self-contained things whole. A long table has to be allowed
+     to break, or it strands most of a sheet every time it will not fit. */
+  .verdict, .note, figure, .eq, dl.spec { break-inside:avoid }
+  figure img { max-height:8.4in; object-fit:contain }
+  figcaption, caption { break-before:avoid }
+  thead { display:table-header-group }
+  tr { break-inside:avoid }
+  .scroll { overflow-x:visible }
+  table { font-size:7.6pt }
+  th, td { padding:6px 8px }
+  p { orphans:3; widows:3 }
+  a { color:var(--ink); text-decoration:none }
+  footer { margin-top:32px; break-inside:avoid }
+}
+"""
+
+CSS = CSS + PRINT_CSS

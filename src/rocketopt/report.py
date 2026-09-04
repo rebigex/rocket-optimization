@@ -20,11 +20,12 @@ import math
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, NamedTuple, Optional, Sequence
 
 import numpy as np
 
 from .design import DesignSpace
+from .pdf import NoBrowser, html_to_pdf
 from .report_style import CSS, FONT_LINK
 from .runner import build_space
 from .simulate import PA_PER_PSI, curves, simulate_motor
@@ -43,6 +44,20 @@ def _today() -> str:
 #: How many designs to tabulate off a front. Enough to show the shape of the
 #: trade, few enough to read without scrolling.
 N_OPTIONS = 7
+
+
+class ReportFiles(NamedTuple):
+    """What a finished report leaves on disk.
+
+    ``pdf`` is the artefact -- it is what gets handed over. ``html`` is the
+    source it was rendered from, kept because it is the readable form and the
+    only one that can be re-rendered. ``pdf`` is None only when no browser was
+    available to render with, and ``pdf_error`` then says so.
+    """
+
+    html: Path
+    pdf: Optional[Path] = None
+    pdf_error: str = ""
 
 
 @dataclass
@@ -365,7 +380,7 @@ def data_uri(path: Path) -> str:
 
 
 def build_report(runs: Sequence[ReportRun], base_motor: Dict, out_dir: Path,
-                 title: Optional[str] = None) -> Path:
+                 title: Optional[str] = None) -> ReportFiles:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     figures = make_figures(runs, base_motor, out_dir / "figures")
@@ -387,7 +402,14 @@ def build_report(runs: Sequence[ReportRun], base_motor: Dict, out_dir: Path,
         esc(title), FONT_LINK, CSS, "\n".join(body))
     path = out_dir / "report.html"
     path.write_text(document)
-    return path
+
+    # A report is a document people file and email, so the artefact is a PDF.
+    # If nothing can render one, say why rather than failing the whole report --
+    # the HTML beside it is still complete.
+    try:
+        return ReportFiles(html=path, pdf=html_to_pdf(path, out_dir / "report.pdf"))
+    except (NoBrowser, OSError, ValueError) as exc:
+        return ReportFiles(html=path, pdf=None, pdf_error=str(exc))
 
 
 def _default_title(runs: Sequence[ReportRun], base_motor: Dict) -> str:

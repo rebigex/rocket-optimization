@@ -352,12 +352,14 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--rule);
   openMotor and re-simulates to exactly the numbers shown &mdash; nothing on screen is a
   model prediction.</p>
   <p>The <strong>Technical report</strong> panel writes the whole study up: hardware,
-  limits, the trade-off curve, tabulated options, geometry, and caveats derived from the
-  run rather than boilerplate. Tick two runs and they are compared side by side. A run
-  that found nothing gets the most attention &mdash; which limit could never be met, how
-  close anything came, and what would have to change.</p>
-  <p>Reports land in <code>outputs/reports/</code>. A finished run can be reopened by
-  its id with <code>?job=&lt;id&gt;</code>.</p>
+  limits, the trade-off curve, tabulated options and geometry, all derived from the run
+  rather than boilerplate. The run you just made is ticked; tick a second and the two are
+  compared side by side. A run that found nothing gets the most attention &mdash; which
+  limit could never be met, how close anything came, and what would have to change.</p>
+  <p>Reports are written as PDFs, into <code>outputs/reports/report.pdf</code>, with the
+  HTML they were rendered from beside them. Rendering uses whichever of Chrome, Chromium,
+  Edge or Brave is installed; with none of them the report still arrives, as HTML. A
+  finished run can be reopened by its id with <code>?job=&lt;id&gt;</code>.</p>
   </div>
 </section>
 

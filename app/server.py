@@ -479,10 +479,19 @@ def make_report(payload: ReportRequest) -> Response:
         raise HTTPException(400, "Pick at least one finished run.")
 
     out = ROOT / "outputs" / "reports"
-    path = build_report(selected, motor, out, title=payload.title)
+    files = build_report(selected, motor, out, title=payload.title)
+    if files.pdf is not None:
+        return Response(
+            content=files.pdf.read_bytes(), media_type="application/pdf",
+            headers={"Content-Disposition": 'inline; filename="motor-report.pdf"',
+                     "X-Report-Format": "pdf"})
+    # Nothing to render with. The HTML is complete, so hand that over rather
+    # than nothing, and say in a header why it is not the PDF that was asked for.
     return Response(
-        content=path.read_text(), media_type="text/html",
-        headers={"Content-Disposition": 'attachment; filename="motor-report.html"'})
+        content=files.html.read_text(), media_type="text/html",
+        headers={"Content-Disposition": 'inline; filename="motor-report.html"',
+                 "X-Report-Format": "html",
+                 "X-Report-Pdf-Error": files.pdf_error[:200]})
 
 
 @app.get("/api/jobs/{job_id}")

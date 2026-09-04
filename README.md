@@ -15,7 +15,7 @@ scripts/setup_env.sh              # venv, deps, openMotor, tests
 ![The optimizer](docs/screenshot.png)
 
 **[Field guide](docs/guide.html)** ([PDF](docs/Optimizer-Field-Guide.pdf)) — how to drive it.
-**[Worked study](docs/five-inch-study.html)** — two optimisations of a 5-inch motor, one of
+**[Worked study](docs/five-inch-study.pdf)** ([HTML](docs/five-inch-study.html)) — two optimisations of a 5-inch motor, one of
 which provably has no answer.
 
 Everything reported is simulated, never predicted: a surrogate may propose and the search
