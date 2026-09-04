@@ -90,8 +90,16 @@ code { font-family: var(--mono); font-size: .88em;
   width: 15px; height: 15px; border-radius: 3px;
   background: linear-gradient(135deg, var(--accent), var(--warn));
 }
+.brand-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
 .brand .title { font-weight: 660; letter-spacing: -.02em; white-space: nowrap; }
-@media (max-width: 900px) { .brand .title { font-size: 12.5px; } }
+.brand .byline {
+  font-size: 10.5px; letter-spacing: .05em; color: var(--ink-3);
+  white-space: nowrap; text-transform: uppercase;
+}
+@media (max-width: 900px) {
+  .brand .title { font-size: 12.5px; }
+  .brand .byline { display: none; }
+}
 .motor-chip {
   display: flex; align-items: center; gap: 8px; padding: 5px 12px;
   background: var(--surface-2); border: 1px solid var(--line);

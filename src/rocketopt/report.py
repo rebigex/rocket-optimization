@@ -18,6 +18,7 @@ import html
 import json
 import math
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
@@ -30,6 +31,14 @@ from .simulate import PA_PER_PSI, curves, simulate_motor
 from .spec import OPTIMISABLE_METRICS, RunSpec
 from .units import KG_M2S_PER_LB_IN2S as LB
 from .units import M_PER_IN as IN
+
+#: Whose tool this is. Carried on every report the app generates.
+AUTHOR = "Lior Benshoshan"
+
+
+def _today() -> str:
+    return date.today().strftime("%-d %B %Y")
+
 
 #: How many designs to tabulate off a front. Enough to show the shape of the
 #: trade, few enough to read without scrolling.
@@ -409,10 +418,12 @@ def _header(title, runs, base_motor, grain, baseline) -> str:
     return """<header>
   <p class="eyebrow">openMotor · {n} × BATES {d} × {l} in · {prop} · {brief}</p>
   <h1>{title}</h1>
+  <p class="byline">Created by {author} · {date}</p>
   <p class="lede">{lede}</p>
 </header>""".format(n=len(base_motor["grains"]), d=inches(grain["diameter"]),
                     l=inches(grain["length"]), prop=esc(base_motor["propellant"]["name"]),
-                    brief=esc(brief), title=esc(title), lede=esc(lede))
+                    brief=esc(brief), title=esc(title), lede=esc(lede),
+                    author=AUTHOR, date=_today())
 
 
 def _verdicts(runs: Sequence[ReportRun]) -> str:
@@ -673,6 +684,7 @@ def _footer(runs: Sequence[ReportRun]) -> str:
   openMotor 0.6.2 (GPLv3, vendored unmodified) · {total:,} simulations across
   {n} optimisation{s} · mode: {modes} · verification timestep {dt} s{merge}<br>
   Every figure and table was derived from designs re-simulated in openMotor, not from
-  model output.
-</footer>""".format(total=total, n=len(runs), s="" if len(runs) == 1 else "s",
+  model output.<br>
+  Lior&#8217;s Really Good&#8482; Rocket Optimizer · created by {author}
+</footer>""".replace("{author}", AUTHOR).format(total=total, n=len(runs), s="" if len(runs) == 1 else "s",
                     modes=esc(modes), dt=runs[0].spec.verify_timestep, merge=merge)

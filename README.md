@@ -1,5 +1,7 @@
 # Rocket Optimization
 
+**Lior’s Really Good™ Rocket Optimizer** — created by Lior Benshoshan.
+
 Machine-learning-assisted design search for solid rocket motors, driven by
 [openMotor](https://github.com/reilleya/openMotor)'s internal ballistics engine running
 headlessly. Point it at a `.ric`, say which dimensions may move and what you want more
