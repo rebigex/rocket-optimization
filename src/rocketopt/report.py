@@ -233,111 +233,6 @@ def _kn_sweep(space: DesignSpace, spec: RunSpec) -> Optional[Dict]:
 
 
 # ---------------------------------------------------------------------------
-# Findings that are worth flagging, derived rather than written by hand
-# ---------------------------------------------------------------------------
-
-
-def findings(run: ReportRun, base_motor: Dict) -> List[Dict]:
-    notes: List[Dict] = []
-    designs = run.designs
-    nozzle = base_motor["nozzle"]
-
-    # A free variable that lands on its bound in nearly every design is not
-    # being optimised, it is being clamped -- and the bound is the real answer.
-    if designs:
-        for var in run.spec.variables:
-            if not var.free or var.name.startswith("core"):
-                continue
-            key = {"exit": "exit", "throat": "throat",
-                   "throat_length": "throat_length"}.get(var.name)
-            if key is None or key not in designs[0]:
-                continue
-            values = np.array([d[key] for d in designs])
-            span = max(var.high - var.low, 1e-12)
-            at_low = float(np.mean((values - var.low) / span < 0.02))
-            at_high = float(np.mean((var.high - values) / span < 0.02))
-            if max(at_low, at_high) >= 0.6:
-                edge = "lower" if at_low > at_high else "upper"
-                bound = var.low if at_low > at_high else var.high
-                notes.append({
-                    "title": "{} sits on its {} bound".format(
-                        var.label or var.name, edge),
-                    "body": "{:.0f}% of the designs land within a hair of {} in. "
-                            "That is a clamp, not an optimum -- whatever you set "
-                            "that bound to is what you will get, so set it to what "
-                            "the hardware actually requires.".format(
-                                100 * max(at_low, at_high), inches(bound)),
-                })
-
-    if nozzle.get("slagCoeff", 0) > 0 or nozzle.get("erosionCoeff", 0) > 0:
-        notes.append({
-            "title": "The throat moves during the burn",
-            "body": "Slag coefficient {:.3f} and erosion coefficient {:.3e} are both "
-                    "in play. openMotor's slag rate goes as 1/pressure, so it bites "
-                    "hardest during tail-off and pushes peak Kn and peak pressure "
-                    "late in the burn.".format(
-                        nozzle.get("slagCoeff", 0.0), nozzle.get("erosionCoeff", 0.0)),
-        })
-
-    binding = [c for c in run.result.get("constraint_activity", [])
-               if c.get("binding_fraction", 0) > 0.4]
-    if binding:
-        notes.append({
-            "title": "What is actually holding you back",
-            "body": "{} {} up against {} on most legal designs. Those are the "
-                    "numbers to revisit if this answer disappoints -- every other "
-                    "limit has room.".format(
-                        " and ".join(b["label"] for b in binding),
-                        "is" if len(binding) == 1 else "are",
-                        "its limit" if len(binding) == 1 else "their limits"),
-        })
-
-    ends = base_motor["grains"][0]["properties"].get("inhibitedEnds", "Neither")
-    if ends == "Neither" and designs:
-        core = designs[0]["cores"][0]
-        d, D = core, base_motor["grains"][0]["properties"]["diameter"]
-        L = base_motor["grains"][0]["properties"]["length"]
-        face = 2 * (math.pi / 4) * (D**2 - d**2)
-        total = math.pi * d * L + face
-        notes.append({
-            "title": "Uninhibited ends are load-bearing here",
-            "body": "At the leading design's forward core the two end faces are "
-                    "{:.0f}% of that grain's burning area. Inhibiting them would "
-                    "remove that share outright, not trim it.".format(
-                        100 * face / total),
-        })
-
-    seeds = run.result.get("stats", {}).get("seeds", 1) or 1
-    if designs and seeds < 2:
-        notes.append({
-            "title": "This ran as a single search",
-            "body": "A genetic search converges on whichever basin it started in, "
-                    "and independent runs of this same configuration have landed "
-                    "several percent apart. One search is a sample of the answer, "
-                    "not the answer -- raise the number of independent searches and "
-                    "the front is merged from all of them.",
-        })
-    elif designs and seeds >= 2:
-        per = run.result.get("stats", {}).get("per_seed", [])
-        found = ", ".join(str(p.get("designs", 0)) for p in per) if per else ""
-        notes.append({
-            "title": "The front is merged from {} independent searches".format(seeds),
-            "body": "Each search is seeded differently and converges somewhere "
-                    "slightly different{}. What is tabulated is the non-dominated "
-                    "set of everything all of them found, which beats spending the "
-                    "same budget on one longer search.".format(
-                        " (they found {} designs each)".format(found) if found else ""),
-        })
-
-    notes.append({
-        "title": "Static test before you fly it",
-        "body": "openMotor is a 0-D steady-state internal ballistics model: no "
-                "ignition transient, no erosive burning, no two-phase flow loss.",
-    })
-    return notes
-
-
-# ---------------------------------------------------------------------------
 # Figures
 # ---------------------------------------------------------------------------
 
@@ -477,7 +372,6 @@ def build_report(runs: Sequence[ReportRun], base_motor: Dict, out_dir: Path,
             _fixed_section(runs, base_motor, grain, nozzle)]
     for index, run in enumerate(runs):
         body.append(_run_section(run, index, base_motor, figures))
-    body.append(_findings_section(runs, base_motor))
     body.append(_footer(runs))
 
     document = "<title>{}</title>\n{}\n<style>{}</style>\n<div class=\"wrap\">{}</div>".format(
@@ -766,22 +660,6 @@ def _feasible_section(run, key, base_motor, figures) -> str:
                '<figcaption>The same options as thrust curves.</figcaption></figure>'.format(
                    data_uri(curve_fig)) if curve_fig else "",
         detail="".join("<dt>{}</dt><dd>{}</dd>".format(esc(k), v) for k, v in detail))
-
-
-def _findings_section(runs: Sequence[ReportRun], base_motor: Dict) -> str:
-    seen, items = set(), []
-    for run in runs:
-        for note in findings(run, base_motor):
-            if note["title"] in seen:
-                continue
-            seen.add(note["title"])
-            items.append("<li><b>{}</b>{}</li>".format(
-                esc(note["title"]), esc(note["body"])))
-    return """<section>
-  <h2>Before you cut anything</h2>
-  <ul class="flags">{}</ul>
-</section>
-<hr class="rule">""".format("".join(items))
 
 
 def _footer(runs: Sequence[ReportRun]) -> str:

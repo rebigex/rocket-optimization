@@ -151,10 +151,8 @@ microseconds instead of a simulation, not because it makes the space small.
 
 **Technical reports on demand.** Tick any finished runs in the report panel and press
 Generate. The document is written from the runs themselves — hardware and limits read off
-the motor and the spec, the trade-off curve and option tables built from the verified
-designs, and the caveats derived rather than boilerplate (a variable pinned to its bound,
-a non-zero slag coefficient, which limits actually bind). A run that found nothing gets
-the most attention: which limit could never be met, how close anything got, and — where
+the motor and the spec, and the trade-off curve and option tables built from the
+verified designs. A run that found nothing gets the most attention: which limit could never be met, how close anything got, and — where
 burning area is closed-form — a proof that no core diameter would have worked, with the
 throat diameter that would. Two runs in one report are compared side by side. Output
 lands in `outputs/reports/` and opens in a new tab.
