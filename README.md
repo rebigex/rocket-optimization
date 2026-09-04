@@ -10,6 +10,8 @@ scripts/setup_env.sh              # venv, deps, openMotor, tests
 .venv/bin/python app.py           # opens http://localhost:8420
 ```
 
+![The optimizer](docs/screenshot.png)
+
 **[Field guide](docs/guide.html)** ([PDF](docs/Optimizer-Field-Guide.pdf)) — how to drive it.
 **[Worked study](docs/five-inch-study.html)** — two optimisations of a 5-inch motor, one of
 which provably has no answer.

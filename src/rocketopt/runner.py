@@ -486,15 +486,33 @@ def run(spec: RunSpec, base_motor: Dict, on_progress: ProgressFn = _noop,
                 dataset, objective.objective_labels[0]).head(12).to_dict("records"),
             "parity": _parity_sample(surrogate, dataset, space),
         }
-        on_progress("search", 0.58, "Mapping the trade-off")
         from .optimize import surrogate_pareto
-        seeds = _seed_designs(dataset, space, objective, baseline_x)
-        run_out = surrogate_pareto(
-            space, surrogate, objective, pop_size=budget["pop"],
-            n_gen=budget["gen"], timestep=spec.verify_timestep,
-            workers=workers, seed=spec.seed, seed_designs=seeds,
-            reference=dataset)
-        front = run_out.get("front", pd.DataFrame())
+        starts = _seed_designs(dataset, space, objective, baseline_x)
+        n_seeds = max(1, int(budget.get("seeds", 1)))
+        # The surrogate is trained once; running NSGA-II against it several times
+        # costs almost nothing and merges the same way the simulator path does.
+        # Without this loop the seed count is silently ignored here and the run
+        # spends one seed's share of the budget instead of all of it.
+        fronts = []
+        for index in range(n_seeds):
+            on_progress("search", 0.58 + 0.30 * index / n_seeds,
+                        "Mapping the trade-off: search {} of {}".format(
+                            index + 1, n_seeds))
+            out = surrogate_pareto(
+                space, surrogate, objective, pop_size=budget["pop"],
+                n_gen=budget["gen"], timestep=spec.verify_timestep,
+                workers=workers, seed=int(spec.seed) + 1009 * index,
+                seed_designs=starts, reference=dataset)
+            found = out.get("front", pd.DataFrame())
+            if len(found):
+                fronts.append(found)
+        front = pd.concat(fronts, ignore_index=True) if fronts else pd.DataFrame()
+        if len(front) and n_obj > 1:
+            front = front.iloc[pareto_indices(-objective.matrix(front))]
+            front = front.reset_index(drop=True)
+        result.stats["per_seed"] = [
+            {"seed": int(spec.seed) + 1009 * i, "designs": int(len(f))}
+            for i, f in enumerate(fronts)]
     else:
         searched = _multi_seed_search(space, objective, spec, budget,
                                       baseline_x, n_obj, workers, on_progress)
