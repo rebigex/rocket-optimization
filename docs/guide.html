@@ -1,0 +1,458 @@
+<title>Optimizer Field Guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --ground:#f3f4f1; --surface:#ffffff; --surface-2:#f9faf7;
+  --ink:#15181d; --ink-2:#565d66; --ink-3:#878e97;
+  --rule:#dfe1da; --rule-2:#ecefe8;
+  --steel:#1f5f9c; --steel-soft:#e8f0f8;
+  --good:#1a6b48; --good-soft:#e7f3ed;
+  --ember:#c9501e; --ember-soft:#fbeee7;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#0f1216; --surface:#171b20; --surface-2:#1c2128;
+    --ink:#eef0ed; --ink-2:#a1a8b0; --ink-3:#767d86;
+    --rule:#262b33; --rule-2:#1e232a;
+    --steel:#60a4e6; --steel-soft:#14263a;
+    --good:#4fb787; --good-soft:#122820;
+    --ember:#e8804d; --ember-soft:#2c1d15;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#0f1216; --surface:#171b20; --surface-2:#1c2128;
+  --ink:#eef0ed; --ink-2:#a1a8b0; --ink-3:#767d86;
+  --rule:#262b33; --rule-2:#1e232a;
+  --steel:#60a4e6; --steel-soft:#14263a;
+  --good:#4fb787; --good-soft:#122820;
+  --ember:#e8804d; --ember-soft:#2c1d15;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink); margin:0; padding:0 24px 90px;
+  font-family:var(--body); font-size:17px; line-height:1.63;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:940px;margin:0 auto}
+.prose{max-width:66ch}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:-.018em}
+h1{font-size:clamp(2.1rem,5vw,3rem);font-weight:700;line-height:1.05}
+h2{font-size:1.4rem;font-weight:650;margin:0 0 .3em}
+h3{font-size:1.02rem;font-weight:650;margin:0 0 .35em}
+p{margin:0 0 1em}
+strong{font-weight:600}
+a{color:var(--steel)}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 1.1em}
+header{padding:70px 0 0}
+.lede{font-size:1.18rem;line-height:1.5;color:var(--ink-2);max-width:60ch;margin:1em 0 0}
+hr.rule{height:1px;background:var(--rule);border:0;margin:50px 0}
+section{margin:48px 0 0}
+section>h2+p,section>h2+.prose{margin-top:.8em}
+
+code{font-family:var(--mono);font-size:.85em;background:var(--rule-2);
+  padding:1px 5px;border-radius:2px;white-space:nowrap}
+kbd{font-family:var(--mono);font-size:.8em;background:var(--surface);
+  border:1px solid var(--rule);border-bottom-width:2px;border-radius:4px;
+  padding:1px 6px;white-space:nowrap}
+pre{font-family:var(--mono);font-size:.8rem;line-height:1.7;background:var(--surface);
+  border:1px solid var(--rule);border-radius:3px;padding:15px 17px;
+  overflow-x:auto;margin:20px 0 0}
+
+/* the workflow is a real sequence, so it gets real numbers */
+ol.steps{counter-reset:s;list-style:none;padding:0;margin:28px 0 0}
+ol.steps>li{counter-increment:s;position:relative;padding:0 0 0 54px;margin-bottom:30px}
+ol.steps>li::before{
+  content:counter(s);position:absolute;left:0;top:-2px;width:34px;height:34px;
+  display:grid;place-items:center;font-family:var(--display);font-size:.92rem;
+  font-weight:700;color:var(--surface);background:var(--steel);border-radius:50%;
+}
+ol.steps h3{margin-bottom:.3em}
+ol.steps p{margin:0 0 .7em;color:var(--ink-2);font-size:.98rem}
+ol.steps p:last-child{margin-bottom:0}
+.panel-name{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:3px}
+
+dl.ref{display:grid;grid-template-columns:minmax(140px,auto) 1fr;gap:9px 22px;
+  margin:22px 0 0;font-size:.95rem;align-items:baseline}
+dl.ref dt{font-family:var(--mono);font-size:.8rem;color:var(--steel);font-weight:600}
+dl.ref dd{margin:0;color:var(--ink-2)}
+
+.note{border-left:2px solid var(--steel);background:var(--steel-soft);
+  padding:15px 19px;margin:22px 0 0;border-radius:0 3px 3px 0}
+.note.warn{border-left-color:var(--ember);background:var(--ember-soft)}
+.note.tip{border-left-color:var(--good);background:var(--good-soft)}
+.note p{margin:0;font-size:.95rem}
+.note p+p{margin-top:.6em}
+.note .lbl{font-family:var(--mono);font-size:.65rem;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--steel);display:block;margin-bottom:6px;font-weight:600}
+.note.warn .lbl{color:var(--ember)}
+.note.tip .lbl{color:var(--good)}
+
+.scroll{overflow-x:auto;margin:22px 0 0;border:1px solid var(--rule);
+  border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:.79rem}
+th{text-align:left;font-weight:600;font-size:.63rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);padding:11px 13px;
+  border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:9px 13px;border-bottom:1px solid var(--rule-2);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td:first-child{white-space:nowrap;color:var(--ink)}
+caption{caption-side:bottom;text-align:left;font-family:var(--display);
+  font-size:.78rem;color:var(--ink-3);padding:11px 13px;line-height:1.5}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));
+  gap:14px;margin:24px 0 0}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+  padding:16px 18px}
+.card h3{font-size:.98rem}
+.card p{margin:0;font-size:.9rem;color:var(--ink-2);line-height:1.55}
+.card .tag{font-family:var(--mono);font-size:.63rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:7px}
+
+ul.check{list-style:none;padding:0;margin:22px 0 0}
+ul.check li{padding:13px 0 13px 28px;border-bottom:1px solid var(--rule-2);
+  font-size:.97rem;position:relative}
+ul.check li:last-child{border-bottom:0}
+ul.check li::before{content:"";position:absolute;left:4px;top:20px;width:8px;height:8px;
+  border-radius:2px;background:var(--ember)}
+ul.check b{font-family:var(--display);font-weight:650;font-size:.93rem;
+  display:block;margin-bottom:2px;color:var(--ink)}
+
+footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--rule);
+  font-family:var(--mono);font-size:.73rem;color:var(--ink-3);line-height:1.8}
+
+@media print {
+  /* Paper has no dark mode. Pin the light palette whatever the screen was doing. */
+  :root, :root[data-theme="dark"] {
+    --ground:#ffffff; --surface:#ffffff; --surface-2:#f8f9f6;
+    --ink:#15181d; --ink-2:#4a515a; --ink-3:#7b828b;
+    --rule:#d5d8d0; --rule-2:#e8ebe4;
+    --steel:#1a5389; --steel-soft:#eef4fa;
+    --good:#175f40; --good-soft:#eef6f1;
+    --ember:#b04619; --ember-soft:#fdf1ea;
+  }
+  body{background:#fff;padding:0;font-size:10.5pt;line-height:1.5}
+  .wrap{max-width:none}
+  header{padding:0}
+  h1{font-size:26pt}
+  h2{font-size:14pt;break-after:avoid}
+  h3{break-after:avoid}
+  .lede{font-size:12pt}
+  hr.rule{margin:22px 0}
+  section{margin:26px 0 0}
+  /* Keep the small, self-contained things whole. Steps are allowed to break --
+     forbidding it strands most of a page every time one will not fit. */
+  .card, .note, .scroll, pre, table{break-inside:avoid}
+  .panel-name, ol.steps h3{break-after:avoid}
+  ol.steps>li{break-before:auto}
+  p, dl.ref{orphans:3; widows:3}
+  .scroll{overflow-x:visible}
+  a{color:var(--ink);text-decoration:none}
+  footer{margin-top:34px}
+}
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">Lior's Really Good™ Rocket Optimizer</p>
+  <h1>Optimizer Field Guide</h1>
+  <p class="lede">It takes an openMotor <code>.ric</code>, searches every buildable
+  variation of it against your limits, and hands back motors you can open in
+  openMotor and machine to the numbers. Here is how to drive it.</p>
+</header>
+
+<hr class="rule">
+
+<section>
+  <h2>Start it</h2>
+<pre>cd "Rocket Optimization"
+.venv/bin/python app.py          <span style="color:var(--ink-3)"># opens http://localhost:8420</span></pre>
+  <div class="prose">
+  <p>It loads <code>Data/Open Motor Data/Current.ric</code> on start. <strong>Change</strong>
+  in the header picks a different file. Whatever you load is simulated exactly as the
+  file says &mdash; the app never edits your motor behind your back.</p>
+  </div>
+  <div class="note tip">
+    <span class="lbl">The short version</span>
+    <p>Load a motor → tick what may change and give each a step → say what you want
+    more of → set your limits → press <strong>Optimize</strong> → pick a design off the
+    curve → export the <code>.ric</code>. Everything below is detail on those seven moves.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>The panels, in the order you use them</h2>
+
+  <ol class="steps">
+    <li>
+      <span class="panel-name">Your motor</span>
+      <h3>Check what you loaded</h3>
+      <p>Grains, bore, nozzle, propellant, and what the motor does as it stands:
+      thrust, impulse, peak pressure, Kn, mass flux. Warnings from openMotor appear
+      here too &mdash; an over-expanded nozzle shows up as <em>low exit pressure</em>.</p>
+      <p>Read these numbers before anything else. If the motor as loaded already breaks
+      a limit, the optimizer is not fixing a small problem, it is looking for a
+      different motor.</p>
+    </li>
+
+    <li>
+      <span class="panel-name">Fixed hardware</span>
+      <h3>Confirm the case</h3>
+      <p>Grain outer diameter, length and count are read from the file and shown
+      greyed out. They are the tube and the mould &mdash; not optimizable, and not
+      editable here. Change them in openMotor and reload.</p>
+      <p>Inhibited ends is the one control that <em>is</em> live, because it is a
+      casting choice rather than hardware. If anything has been overridden, the panel
+      says <strong>modified from file</strong> and offers <strong>Reset to file</strong>.</p>
+    </li>
+
+    <li>
+      <span class="panel-name">What may change</span>
+      <h3>Unlock dimensions and set your machining grid</h3>
+      <p>One row per dimension: six grain cores, nozzle throat, nozzle exit, throat
+      length. Untick a row to hold it at its current value; a held dimension leaves the
+      search entirely rather than being searched over a zero-width range.</p>
+      <p><strong>Step</strong> is your machining grid, and it is the field people skip.
+      Type <code>0.01</code>, <code>1/16</code>, <code>1 1/16</code>, or <code>2-1/2</code>
+      &mdash; shop fractions parse. Leave it blank and the optimizer will hand you a
+      2.4713″ core. The grid is anchored at zero, so a 1/16″ step offers whole
+      sixteenths rather than sixteenths measured from wherever your lower bound
+      happened to sit.</p>
+      <p>The chips below set every step at once. <code>0.01″</code> is two decimal
+      places, which is the finest most people hold.</p>
+    </li>
+
+    <li>
+      <span class="panel-name">Possible configurations</span>
+      <h3>See how big the problem is</h3>
+      <p>Updates live. It counts <em>distinct motors</em>, not grid points: cores are
+      stored sorted, so one set of six diameters is one motor rather than 720. On the
+      5-inch motor with all nine dimensions free on a 0.01″ grid that is
+      <strong>4.5&nbsp;×&nbsp;10¹⁹</strong>, and brute force would take 4.4&nbsp;×&nbsp;10¹⁰ years.</p>
+      <p>With a Kn limit set, it also shows what the limits provably rule out and offers
+      <strong>Apply tighter bounds</strong>. That narrows the search to a region where a
+      legal motor can still exist &mdash; it never removes anything legal.</p>
+    </li>
+
+    <li>
+      <span class="panel-name">What to optimize</span>
+      <h3>Say what you want more of</h3>
+      <p>Any of sixteen metrics, each set to maximize, minimize, or hit a target. Tick
+      two and you get a trade-off curve instead of a single answer, which is almost
+      always what you want &mdash; thrust and impulse pull against each other, and the
+      interesting question is where on that curve you want to sit.</p>
+      <p>The presets cover the common cases: <em>Max initial thrust</em>,
+      <em>Max impulse</em>, <em>Flattest curve</em>, <em>Thrust vs impulse</em>.</p>
+    </li>
+
+    <li>
+      <span class="panel-name">Limits it must respect</span>
+      <h3>Set the envelope</h3>
+      <p>Rows of <em>metric</em> ≤ or ≥ <em>value</em>. They start from your <code>.ric</code>'s
+      own <code>maxPressure</code>, <code>maxMassFlux</code> and <code>minPortThroat</code>.
+      Untick one to ignore it; add your own with <strong>+ add</strong>.</p>
+      <p>Nothing is reported unless it clears every ticked limit when re-simulated at
+      full fidelity with all safety margins removed.</p>
+    </li>
+
+    <li>
+      <span class="panel-name">Grain cores</span>
+      <h3>Choose an ordering rule</h3>
+      <p>Four options, and they change the answer more than people expect:</p>
+      <div class="scroll" style="margin-top:12px">
+      <table>
+        <tbody>
+          <tr><td>Any order</td><td>No rule. Rarely what you want &mdash; the aft grain
+            ends up choking.</td></tr>
+          <tr><td>Never narrow aft</td><td>Cores never shrink going aft, ties allowed.
+            The default, and what your current motor already does.</td></tr>
+          <tr><td>Strictly wider</td><td>Each core exceeds the one ahead by a minimum
+            you set. Costs about 0.8 points of thrust versus allowing ties.</td></tr>
+          <tr><td>Paired mandrels</td><td>A few sizes shared across grains &mdash;
+            3&nbsp;sizes&nbsp;×&nbsp;2&nbsp;grains, say. Fewer mandrels to cut.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </li>
+
+    <li>
+      <span class="panel-name">How hard to look</span>
+      <h3>Set the budget and the number of searches</h3>
+      <p>Quick / Standard / Thorough set a simulation budget (3,600 / 14,400 / 43,200),
+      or type your own. <strong>Independent searches</strong> splits that budget across
+      separate runs and merges what they find.</p>
+      <p>Raise the search count before the budget. Three 4,800-simulation searches
+      merged beat a single 14,400-simulation search on the same motor &mdash; better
+      answer, same cost.</p>
+      <p><em>Map the full trade-off</em> trains surrogate models first. Slower, but it
+      maps a denser curve. For most work the plain search is enough.</p>
+    </li>
+  </ol>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Reading the results</h2>
+  <div class="prose">
+  <p>Four profiles across the top of the workspace. Same run, four questions.</p>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <span class="tag">one motor</span>
+      <h3>Design Review</h3>
+      <p>Thrust curve, chamber pressure and Kn, a scaled cross-section, the spec sheet,
+      and margin bars showing how close it runs to each limit. Amber means within 3% of
+      a limit.</p>
+    </div>
+    <div class="card">
+      <span class="tag">all of them</span>
+      <h3>Trade-off Explorer</h3>
+      <p>The curve of options &mdash; click any point to load it into Design Review.
+      Plus every design tried, a parallel-coordinates view of what the good ones have
+      in common, and a table with a <code>.ric</code> button on every row.</p>
+    </div>
+    <div class="card">
+      <span class="tag">the search</span>
+      <h3>Optimizer Diagnostics</h3>
+      <p>Progress against simulations spent, which limit is actually binding, and — in
+      trade-off mode — how accurate the models were and which dimension matters most.</p>
+    </div>
+    <div class="card">
+      <span class="tag">before and after</span>
+      <h3>Compare &amp; Safety</h3>
+      <p>Your motor against the selected design, a spec delta table, mass flux in each
+      grain against its limit, and a tornado of what moves the leading objective.</p>
+    </div>
+  </div>
+  <div class="note">
+    <span class="lbl">Which limit is holding you back</span>
+    <p>The bar chart in Diagnostics is the most useful panel in the app when a result
+    disappoints. It shows what share of legal designs sit within 2% of each limit. A bar
+    near zero means that limit is doing nothing; a red bar is the number to revisit.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Exporting and writing it up</h2>
+  <div class="prose">
+  <p>Every row of the options table has a <code>.ric</code> button. The file opens in
+  openMotor and re-simulates to exactly the numbers shown &mdash; nothing on screen is a
+  model prediction.</p>
+  <p>The <strong>Technical report</strong> panel writes the whole study up: hardware,
+  limits, the trade-off curve, tabulated options, geometry, and caveats derived from the
+  run rather than boilerplate. Tick two runs and they are compared side by side. A run
+  that found nothing gets the most attention &mdash; which limit could never be met, how
+  close anything came, and what would have to change.</p>
+  <p>Reports land in <code>outputs/reports/</code>. A finished run can be reopened by
+  its id with <code>?job=&lt;id&gt;</code>.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Five things worth understanding</h2>
+
+  <dl class="ref">
+    <dt>Initial thrust</dt>
+    <dd>The mean of the thrust curve over the first 0.35&nbsp;s, excluding openMotor's
+      zero-thrust sample at t&nbsp;=&nbsp;0. Not peak thrust, and not thrust at ignition.</dd>
+
+    <dt>Legal</dt>
+    <dd>Re-simulated at a 0.002&nbsp;s timestep with every search-time margin removed,
+      and clearing each ticked limit on <em>those</em> numbers.</dd>
+
+    <dt>Kn and pressure</dt>
+    <dd>One constraint wearing two hats — pressure is a monotone function of Kn. On this
+      propellant 500&nbsp;psi is reached at <strong>Kn&nbsp;224.5</strong>, so a Kn ceiling
+      of 225 is the looser of the two and raising it alone changes nothing.</dd>
+
+    <dt>Seeds</dt>
+    <dd>The search is stochastic. Identical runs have landed 6.4% apart on best thrust,
+      which is why several run and merge by default. One search is a sample of the
+      answer, not the answer.</dd>
+
+    <dt>Grain order</dt>
+    <dd>In openMotor's model, order changes nothing except mass flux and port/throat,
+      and both are best with the widest core aft. So cores are always stored sorted,
+      which removes a 720-fold redundancy from the search.</dd>
+  </dl>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Worked example</h2>
+  <div class="prose">
+  <p>The 5-inch motor: six 5.00&nbsp;×&nbsp;6.00&nbsp;in BATES grains, Mad River Blue,
+  uninhibited ends. As loaded it runs at 860&nbsp;psi and Kn&nbsp;323 &mdash; well outside
+  a 500&nbsp;psi / Kn&nbsp;225 / 1.05&nbsp;lb·in⁻²s⁻¹ envelope.</p>
+  <p>All nine dimensions free on a 0.01″ grid, both thrust and impulse maximized,
+  99,840 simulations across eight searches, 54 minutes:</p>
+  </div>
+  <div class="scroll">
+  <table>
+    <caption>Seven options off a 60-design front. Row 4 has the highest ISP and holds
+    90% of the best thrust with 86% of the best impulse.</caption>
+    <thead><tr><th class="n">#</th><th>Class</th><th class="n">Initial N</th>
+      <th class="n">Impulse N·s</th><th class="n">ISP</th><th class="n">psi</th>
+      <th class="n">Kn</th><th>Cores (in)</th><th class="n">Throat</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td>N4165</td><td class="n">7,194</td><td class="n">11,429</td><td class="n">181.9</td><td class="n">497</td><td class="n">224</td><td>3.58 3.84 4.00 4.11 4.24 4.48</td><td class="n">1.75</td></tr>
+      <tr><td class="n">2</td><td>N5315</td><td class="n">6,944</td><td class="n">17,730</td><td class="n">196.0</td><td class="n">495</td><td class="n">223</td><td>3.37 3.44 3.49 3.52 3.60 3.89</td><td class="n">1.72</td></tr>
+      <tr><td class="n">3</td><td>O5200</td><td class="n">6,700</td><td class="n">22,164</td><td class="n">197.5</td><td class="n">497</td><td class="n">224</td><td>2.97 2.99 3.05 3.06 3.19 3.38</td><td class="n">1.68</td></tr>
+      <tr><td class="n">4</td><td>O5459</td><td class="n">6,455</td><td class="n">25,014</td><td class="n">197.8</td><td class="n">497</td><td class="n">224</td><td>2.59 2.76 2.76 2.78 2.79 2.98</td><td class="n">1.65</td></tr>
+      <tr><td class="n">5</td><td>O4788</td><td class="n">6,190</td><td class="n">26,995</td><td class="n">197.5</td><td class="n">493</td><td class="n">222</td><td>2.33 2.36 2.42 2.43 2.62 2.89</td><td class="n">1.63</td></tr>
+      <tr><td class="n">6</td><td>O3976</td><td class="n">5,859</td><td class="n">28,462</td><td class="n">194.8</td><td class="n">494</td><td class="n">223</td><td>1.82 1.84 1.90 2.33 2.58 2.80</td><td class="n">1.60</td></tr>
+      <tr><td class="n">7</td><td>O3441</td><td class="n">5,550</td><td class="n">29,141</td><td class="n">191.9</td><td class="n">478</td><td class="n">218</td><td>1.44 1.47 1.87 2.14 2.44 2.70</td><td class="n">1.60</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    <span class="lbl">How good is 7,194 N?</span>
+    <p>There is an arithmetic ceiling for this motor that no search can beat: bound one
+    grain's burning area over the whole box, multiply by six, divide by the binding Kn
+    to get the largest useful throat area, multiply by the best achievable thrust
+    coefficient and the pressure limit. That gives <strong>7,517&nbsp;N</strong>. The
+    search got within 4.3% of a number nothing in the space can exceed.</p>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <h2>Running it without the app</h2>
+  <div class="prose">
+  <p>Everything the app does is a library call. The scripts are the reproducible path.</p>
+  </div>
+<pre>scripts/verify_ordering.py     check the core-sorting assumption against the simulator
+scripts/build_dataset.py       sample and simulate a design set
+scripts/train_surrogate.py     fit and score the surrogate models
+scripts/run_envelope.py        optimise inside a fixed operating envelope
+scripts/big_run.py             the 100,000-simulation, 8-seed study
+.venv/bin/python -m pytest tests/ -q</pre>
+  <div class="note warn">
+    <span class="lbl">If a run comes back empty</span>
+    <p>That is a result, not a failure. Check Diagnostics for which limit was violated
+    by everything, and read the report's <em>no answer</em> section &mdash; for a fixed
+    nozzle it will tell you the throat diameter that would make a legal motor possible,
+    and prove no core diameter could have.</p>
+  </div>
+</section>
+
+<footer>
+  openMotor 0.6.2 (GPLv3, vendored unmodified) · every number in this guide came from a
+  simulation, not a model<br>
+  App at <code>http://localhost:8420</code> · outputs under <code>outputs/</code>
+</footer>
+</div>

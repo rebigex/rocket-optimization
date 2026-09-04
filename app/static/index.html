@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lior's Really Good™ Rocket Optimizer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🚀</text></svg>">
+<link rel="stylesheet" href="/app.css">
+<script src="/vendor/plotly.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <span class="title">Lior's Really Good™ Rocket Optimizer</span>
+  </div>
+
+  <div class="motor-chip" id="motorChip">
+    <span class="chip-name" id="chipName">loading…</span>
+    <span class="chip-sep">·</span>
+    <span class="chip-class" id="chipClass"></span>
+    <button class="link" id="btnLoad" type="button">Change</button>
+    <input type="file" id="fileInput" accept=".ric" hidden>
+  </div>
+
+  <div class="topbar-right">
+    <div class="unit-toggle" role="group" aria-label="Units">
+      <button type="button" data-unit="in" class="active">inch</button>
+      <button type="button" data-unit="mm">mm</button>
+    </div>
+    <button type="button" class="ghost" id="btnTheme" title="Light / dark">◐</button>
+    <button type="button" class="primary" id="btnRun">
+      <span id="runLabel">Optimize</span>
+    </button>
+  </div>
+</header>
+
+<div class="progress" id="progress" hidden>
+  <div class="bar"><div class="fill" id="progressFill"></div></div>
+  <div class="progress-text">
+    <span id="progressMsg">Starting…</span>
+    <button type="button" class="link" id="btnCancel">Cancel</button>
+  </div>
+</div>
+
+<main class="layout">
+
+  <!-- ------------------------------------------------ configuration rail -->
+  <aside class="rail" id="rail">
+
+    <section class="card">
+      <h2>Your motor</h2>
+      <dl class="specs" id="motorSpecs"></dl>
+      <div class="warnings" id="motorWarnings"></div>
+    </section>
+
+    <section class="card">
+      <h2>Fixed hardware</h2>
+      <p class="hint">Read from your .ric and never changed &mdash; not by the
+        optimizer, not by this app.</p>
+      <table class="vars hardware">
+        <tbody>
+          <tr><td class="var-name">Grain outer diameter</td>
+              <td><input type="text" id="hwDiameter" disabled></td></tr>
+          <tr><td class="var-name">Grain length</td>
+              <td><input type="text" id="hwLength" disabled></td></tr>
+          <tr><td class="var-name">Number of grains</td>
+              <td><input type="text" id="hwCount" disabled></td></tr>
+          <tr><td class="var-name">Inhibited ends</td>
+              <td><select id="hwEnds">
+                <option value="Neither">Neither</option>
+                <option value="Top">Top</option>
+                <option value="Bottom">Bottom</option>
+                <option value="Both">Both</option>
+              </select></td></tr>
+        </tbody>
+      </table>
+      <div class="design-actions">
+        <button type="button" class="chip" id="btnHardware">Apply hardware</button>
+        <button type="button" class="chip" id="btnHardwareReset" hidden>Reset to file</button>
+        <span class="hw-flag" id="hwFlag" hidden>modified from file</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>What may change</h2>
+        <div class="head-actions">
+          <button type="button" class="link" data-all="free">all free</button>
+          <button type="button" class="link" data-all="fixed">all fixed</button>
+        </div>
+      </div>
+      <p class="hint">Untick a row to hold it at your current value. <strong>Step</strong>
+        is your machining grid &mdash; type <code>1/16</code> or <code>0.05</code>,
+        or leave blank for any size.</p>
+      <div class="table-scroll">
+        <table class="vars">
+          <thead><tr><th></th><th>Dimension</th><th class="n">Min</th><th class="n">Max</th><th class="n">Step</th></tr></thead>
+          <tbody id="varRows"></tbody>
+        </table>
+      </div>
+      <div class="quick-steps">
+        <span class="label">Set every step to</span>
+        <button type="button" class="chip" data-step="0">any</button>
+        <button type="button" class="chip" data-step="0.01">0.01″</button>
+        <button type="button" class="chip" data-step="0.05">0.05″</button>
+        <button type="button" class="chip" data-step="0.1">0.1″</button>
+        <button type="button" class="chip" data-step="0.0625">1/16″</button>
+      </div>
+    </section>
+
+    <section class="card" id="sizingCard">
+      <h2>Possible configurations</h2>
+      <div class="sizing" id="sizing"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>What to optimize</h2>
+        <button type="button" class="link" id="btnAddObjective">+ add</button>
+      </div>
+      <div class="rows" id="objectiveRows"></div>
+      <div class="presets">
+        <span class="label">Presets</span>
+        <button type="button" class="chip" data-preset="thrust">Max initial thrust</button>
+        <button type="button" class="chip" data-preset="impulse">Max impulse</button>
+        <button type="button" class="chip" data-preset="flat">Flattest curve</button>
+        <button type="button" class="chip" data-preset="tradeoff">Thrust vs impulse</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Limits it must respect</h2>
+        <button type="button" class="link" id="btnAddConstraint">+ add</button>
+      </div>
+      <div class="rows" id="constraintRows"></div>
+    </section>
+
+    <section class="card">
+      <h2>Grain cores</h2>
+      <div class="field">
+        <select id="orderingMode"></select>
+      </div>
+      <div class="field" id="orderingStepField" hidden>
+        <label for="orderingStep">Minimum increase per grain</label>
+        <input type="text" id="orderingStep" inputmode="decimal">
+      </div>
+      <div class="field" id="orderingGroupsField" hidden>
+        <label for="orderingGroups">Mandrel sizes</label>
+        <select id="orderingGroups"></select>
+      </div>
+    </section>
+
+    <section class="card" id="reportCard">
+      <div class="card-head">
+        <h2>Technical report</h2>
+        <button type="button" class="link" id="btnRefreshRuns">refresh</button>
+      </div>
+      <p class="hint">Tick the runs to write up. Two runs are compared side by side &mdash;
+        a run that found nothing gets a section explaining why.</p>
+      <div class="runs" id="runList"></div>
+      <div class="field">
+        <label for="reportTitle">Title <span style="color:var(--ink-3)">(optional)</span></label>
+        <input type="text" id="reportTitle" placeholder="named from the motor class if blank">
+      </div>
+      <div class="design-actions">
+        <button type="button" class="chip" id="btnReport">Generate report</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>How hard to look</h2>
+      <div class="seg" id="effortSeg" role="group"></div>
+      <div class="budget">
+        <div class="field">
+          <label for="budgetSims">Simulation budget</label>
+          <input type="text" id="budgetSims" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="seedCount">Independent searches</label>
+          <select id="seedCount"></select>
+        </div>
+      </div>
+      <p class="hint" id="budgetSplit"></p>
+      <label class="check">
+        <input type="checkbox" id="modePareto">
+        <span>Map the full trade-off <em>(trains a model first &mdash; slower, but
+          gives you a curve of options instead of one answer)</em></span>
+      </label>
+      <p class="estimate" id="estimate"></p>
+      <div class="problems" id="problems"></div>
+    </section>
+  </aside>
+
+  <!-- --------------------------------------------------------- workspace -->
+  <section class="workspace">
+    <nav class="profiles" id="profiles" role="tablist"></nav>
+
+    <div class="empty" id="emptyState">
+      <div class="empty-inner">
+        <h3>Ready when you are</h3>
+        <p>Your motor is loaded and drawn below. Choose what may change and what
+          you want more of, then press <strong>Optimize</strong>.</p>
+        <div id="emptyPreview" class="empty-preview"></div>
+      </div>
+    </div>
+
+    <div class="panels" id="panels" hidden></div>
+  </section>
+</main>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="/charts.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

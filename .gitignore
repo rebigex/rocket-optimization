@@ -1,0 +1,15 @@
+# Working data: datasets, trained models, run results, figures. Regenerate with
+# the scripts; none of it is source.
+outputs/
+
+# openMotor is GPLv3 and is cloned by scripts/setup_env.sh, not redistributed here.
+vendor/
+
+# Plotly's bundled JS is copied out of the pip package at setup time (4 MB).
+app/static/vendor/
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
