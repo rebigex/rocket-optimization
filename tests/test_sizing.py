@@ -237,3 +237,95 @@ def test_kn_and_pressure_are_reported_as_one_constraint(spec):
     found = equivalent_limits(spec, load_ric(MOTOR))
     assert found and found[0]["binding"] in ("Kn", "pressure")
     assert 150 < found[0]["kn_at_pressure"] < 400
+
+
+# ------------------------------------------------------- tolerance analysis
+
+
+def test_per_grain_tolerances_vary_independently():
+    """Six cores from six passes must not all move together."""
+    import numpy as np
+
+    from rocketopt.tolerance import ToleranceSpec, perturb
+
+    base = load_ric(MOTOR)
+    rng = np.random.default_rng(0)
+    tol = [ToleranceSpec("core_diameter", 0.01 * IN)]
+    built = perturb(base, tol, rng)
+    deltas = [b["properties"]["coreDiameter"] - a["properties"]["coreDiameter"]
+              for a, b in zip(base["grains"], built["grains"])]
+    assert len(set(round(d, 12) for d in deltas)) > 1, "cores moved identically"
+
+
+def test_batch_tolerances_move_every_grain_together():
+    """Burn rate is a property of the mix, not of each grain."""
+    import numpy as np
+
+    from rocketopt.tolerance import ToleranceSpec, perturb
+
+    base = load_ric(MOTOR)
+    built = perturb(base, [ToleranceSpec("burn_rate_a", 0.05)],
+                    np.random.default_rng(0))
+    ratios = [t2["a"] / t1["a"] for t1, t2
+              in zip(base["propellant"]["tabs"], built["propellant"]["tabs"])]
+    assert len(set(round(r, 12) for r in ratios)) == 1
+    assert abs(ratios[0] - 1.0) > 1e-9, "nothing was perturbed"
+
+
+def test_perturbation_never_builds_an_impossible_motor():
+    """However unlucky the draw, the result must still simulate."""
+    import numpy as np
+
+    from rocketopt.simulate import simulate_motor
+    from rocketopt.tolerance import ToleranceSpec, perturb
+
+    base = load_ric(MOTOR)
+    rng = np.random.default_rng(4)
+    wild = [ToleranceSpec("core_diameter", 0.5 * IN),
+            ToleranceSpec("throat", 0.5 * IN),
+            ToleranceSpec("burn_rate_a", 0.5)]
+    for _ in range(25):
+        built = perturb(base, wild, rng)
+        for grain in built["grains"]:
+            props = grain["properties"]
+            assert 0 < props["coreDiameter"] < props["diameter"]
+        assert built["nozzle"]["exit"] >= built["nozzle"]["throat"]
+        assert simulate_motor(built, timestep=0.05) is not None
+
+
+def test_zero_tolerance_reproduces_the_design_exactly():
+    import numpy as np
+
+    from rocketopt.tolerance import ToleranceSpec, perturb
+
+    base = load_ric(MOTOR)
+    built = perturb(base, [ToleranceSpec("throat", 0.0)], np.random.default_rng(0))
+    assert built["nozzle"]["throat"] == base["nozzle"]["throat"]
+
+
+def test_propagate_reports_a_pass_rate_and_names_the_risk():
+    from rocketopt.spec import ConstraintSpec
+    from rocketopt.tolerance import ToleranceSpec, propagate, summarise
+    from rocketopt.units import PA_PER_PSI as PSI
+
+    base = load_ric(MOTOR)
+    limits = [ConstraintSpec("max_pressure", "<=", 900 * PSI,
+                             label="Peak chamber pressure")]
+    report = propagate(base, [ToleranceSpec("throat", 0.01 * IN)], limits,
+                       samples=40, timestep=0.05, workers=2)
+    assert report["available"]
+    assert 0.0 <= report["pass_rate"] <= 1.0
+    assert report["pass_low"] <= report["pass_rate"] <= report["pass_high"]
+    assert report["per_limit"][0]["metric"] == "max_pressure"
+    assert isinstance(summarise(report), str)
+
+
+def test_propagate_says_so_when_nothing_varies():
+    from rocketopt.spec import ConstraintSpec
+    from rocketopt.tolerance import ToleranceSpec, propagate
+
+    report = propagate(load_ric(MOTOR),
+                       [ToleranceSpec("throat", 0.0, enabled=False)],
+                       [ConstraintSpec("peak_kn", "<=", 225.0)],
+                       samples=10, timestep=0.05)
+    assert not report["available"]

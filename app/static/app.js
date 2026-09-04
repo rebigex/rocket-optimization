@@ -13,6 +13,7 @@ const App = (() => {
   const state = {
     spec: null, motor: null, metrics: {}, orderingModes: {}, effortLevels: {},
     unit: 'in', jobId: null, poll: null, results: null, runs: [],
+    tolerances: null, toleranceFields: {}, robustness: null,
     profile: 'design', selected: 0, baselineCurves: null
   };
 
@@ -91,6 +92,8 @@ const App = (() => {
     state.effortLevels = data.effort_levels;
     state.baselineCurves = data.curves;
     state.hardware = data.hardware || {};
+    state.toleranceFields = data.tolerance_fields || {};
+    if (!state.tolerances) state.tolerances = data.tolerances || [];
     renderMotor();
     renderHardware();
     renderConfig();
@@ -246,7 +249,7 @@ const App = (() => {
 
   function renderConfig() {
     renderVariables(); renderObjectives(); renderConstraints();
-    renderOrdering(); renderEffort();
+    renderTolerances(); renderOrdering(); renderEffort();
   }
 
   function renderVariables() {
@@ -371,6 +374,49 @@ const App = (() => {
         state.spec.constraints.splice(Number(b.dataset.del), 1);
         renderConstraints(); validate();
       }));
+  }
+
+  function renderTolerances() {
+    const host = $('#toleranceRows');
+    if (!host) return;
+    host.innerHTML = (state.tolerances || []).map((t, i) => {
+      const meta = state.toleranceFields[t.field] || {};
+      // Absolute tolerances are a length; relative ones are a percentage.
+      const abs = meta.kind === 'absolute';
+      const shown = abs ? toDisplay(t.sigma).toFixed(4) : (t.sigma * 100).toFixed(1);
+      const unit = abs ? (state.unit === 'in' ? '″' : 'mm') : '%';
+      return `<div class="row tol ${t.enabled ? '' : 'off'}">
+        <input type="checkbox" ${t.enabled ? 'checked' : ''} data-t="${i}" data-k="enabled">
+        <span class="tol-name" title="${meta.help || ''}">${meta.label || t.field}</span>
+        <input type="text" data-t="${i}" data-k="sigma" value="${shown}">
+        <span class="unit">${unit}</span></div>`;
+    }).join('');
+    host.querySelectorAll('[data-k]').forEach(input => {
+      input.addEventListener('change', () => {
+        const t = state.tolerances[Number(input.dataset.t)];
+        const meta = state.toleranceFields[t.field] || {};
+        if (input.dataset.k === 'enabled') t.enabled = input.checked;
+        else {
+          const v = parseNumber(input.value);
+          if (!isNaN(v)) t.sigma = meta.kind === 'absolute' ? toSI(v) : v / 100;
+        }
+        renderTolerances();
+      });
+    });
+  }
+
+  async function checkRobustness(node) {
+    const ctx = context();
+    if (!ctx.design) { toast('Run the optimizer first.'); return; }
+    node.innerHTML = '<p class="sub">Building 400 motors and firing them…</p>';
+    const res = await fetch('/api/robustness', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spec: state.results.spec || state.spec, x: ctx.design.x,
+                             tolerances: state.tolerances, samples: 400 })
+    });
+    if (!res.ok) { node.innerHTML = '<p class="sub">Could not run the check.</p>'; return; }
+    state.robustness = await res.json();
+    renderPanels();
   }
 
   function renderOrdering() {
@@ -666,6 +712,7 @@ const App = (() => {
     if (!res.ok) { toast('Could not fetch results.'); return; }
     state.results = await res.json();
     state.selected = 0;
+    state.robustness = null;
     if (!state.results.designs.length) {
       toast(state.results.messages[0] || 'No design met every limit.', 6000);
     } else {
@@ -708,6 +755,8 @@ const App = (() => {
       constraintActivity: r.constraint_activity || [],
       sensitivity: r.sensitivity || [],
       constraints: (((r.spec || state.spec).constraints) || []).filter(c => c.enabled),
+      robustness: state.robustness,
+      onCheckRobustness: checkRobustness,
       searched: (r.stats && r.stats.searched) || [],
       selected: state.selected,
       axes
@@ -737,6 +786,7 @@ const App = (() => {
 
   function selectDesign(index) {
     state.selected = index;
+    state.robustness = null;   // belongs to the design it was run on
     renderPanels();
     toast('Loaded option ' + (index + 1));
   }

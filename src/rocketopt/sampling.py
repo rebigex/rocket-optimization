@@ -116,6 +116,37 @@ def evaluate_batch(
         return owned.evaluate(X)
 
 
+# --- simulating arbitrary motors, not design vectors -----------------------
+# Tolerance analysis perturbs a motor directly rather than moving through the
+# design space, so it needs a pool that takes motor dicts.
+
+_MOTOR_TIMESTEP: float = 0.01
+
+
+def _init_motor_worker(timestep: float) -> None:
+    global _MOTOR_TIMESTEP
+    _MOTOR_TIMESTEP = timestep
+    for var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+        os.environ[var] = "1"
+
+
+def _simulate_motor_worker(motor: Dict):
+    return simulate_motor(motor, timestep=_MOTOR_TIMESTEP)
+
+
+def simulate_many(motors: List[Dict], timestep: float = 0.01,
+                  workers: Optional[int] = None) -> List:
+    """Simulates a list of complete motors in parallel."""
+    if workers is None:
+        workers = max(1, (os.cpu_count() or 2) - 2)
+    if workers <= 1 or len(motors) < 2 * workers:
+        return [simulate_motor(m, timestep=timestep) for m in motors]
+    chunk = max(1, len(motors) // (workers * 4))
+    with ProcessPoolExecutor(max_workers=workers, initializer=_init_motor_worker,
+                             initargs=(timestep,)) as pool:
+        return list(pool.map(_simulate_motor_worker, motors, chunksize=chunk))
+
+
 def sobol_designs(space: DesignSpace, n: int, seed: int = 0) -> np.ndarray:
     """Draws ``n`` canonical designs from a scrambled Sobol sequence.
 

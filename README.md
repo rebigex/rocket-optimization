@@ -93,6 +93,17 @@ brute force would take — on a 0.01 in grid with all nine dimensions free that 
 line. `sizing.py` carries the combinatorics; `tests/test_sizing.py` checks the formulas
 against brute-force enumeration.
 
+**Tolerance analysis.** The optimiser works from nominal dimensions, so every design it
+returns sits exactly on whatever limits you set. Compare & Safety will build that design
+a few hundred times with your shop's tolerances applied — core diameters varying
+independently because each is a separate reamer pass, the propellant batch varying as one
+draw because every grain comes from the same mix — and report how often it still stays
+legal. On the balanced design from the 5-inch study, with ±0.005 in on the throat and
+cores and 3% on the burn-rate coefficient, that is **51%**. Nominal is not a guarantee.
+
+Uncertainty is declared against the hardware and the propellant, once, in the rail. It
+never needs to know what is being optimised, which is why it needs no per-run setup.
+
 **Several searches, merged.** NSGA-II is stochastic and offers no guarantee it found the
 global front. Running the identical configuration three times with different seeds put
 best initial thrust 6.4% apart, and 17–62% of each run's front was strictly beaten by
@@ -207,6 +218,7 @@ src/rocketopt/
   optimize.py    direct GA, Bayesian optimisation, NSGA-II + verification
   runner.py      one configuration -> one verified set of results
   sizing.py      how many distinct motors a configuration admits
+  tolerance.py   what a design does when it is built, not drawn
   report.py      the technical report, derived entirely from the runs
   report_style.py  the report stylesheet, kept as data
   plotting.py    figures for the static report

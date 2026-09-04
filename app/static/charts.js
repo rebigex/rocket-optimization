@@ -387,6 +387,86 @@ const Charts = (() => {
       }
     },
 
+    robustness: {
+      title: 'What happens when you build it',
+      sub: 'The same design made many times, with your tolerances applied',
+      render(node, ctx) {
+        const r = ctx.robustness;
+        if (!r) {
+          node.innerHTML = `<div class="robust">
+            <p class="lead">The optimizer works from nominal dimensions, so every
+            design it returns sits exactly on whatever limits you set. This simulates
+            the design as it would actually come out of the shop — core diameters,
+            throat, and propellant batch each varying by the tolerances in the rail —
+            and reports how often it still stays legal.</p>
+            <div><button type="button" class="chip" id="btnRobust">Check robustness</button></div>
+          </div>`;
+          const b = node.querySelector('#btnRobust');
+          if (b) b.addEventListener('click', () => ctx.onCheckRobustness(node));
+          return;
+        }
+        if (!r.available) {
+          node.innerHTML = `<p class="sub">${r.reason || 'No robustness data.'}</p>`;
+          return;
+        }
+        const pct = 100 * r.pass_rate;
+        const cls = pct >= 90 ? 'ok' : (pct >= 70 ? '' : 'bad');
+        const bars = (r.per_limit || []).map(l => {
+          const p = 100 * l.exceed_probability;
+          const fill = p < 1 ? 'none' : (p < 10 ? 'low' : '');
+          return `<div class="bar-row">
+            <span class="label">${l.label}</span>
+            <span class="track"><span class="fill ${fill}"
+              style="width:${Math.min(p, 100).toFixed(1)}%"></span></span>
+            <span class="pct">${p.toFixed(0)}% over</span></div>`;
+        }).join('');
+        node.innerHTML = `<div class="robust">
+          <div class="headline">
+            <span class="rate ${cls}">${pct.toFixed(0)}%</span>
+            <span class="rate-note">of ${r.samples} builds stay inside every limit<br>
+              95% confidence ${(100 * r.pass_low).toFixed(0)}–${(100 * r.pass_high).toFixed(0)}%</span>
+          </div>
+          <div>${bars}</div>
+          <div><button type="button" class="chip" id="btnRobust">Run again</button></div>
+        </div>`;
+        const b = node.querySelector('#btnRobust');
+        if (b) b.addEventListener('click', () => ctx.onCheckRobustness(node));
+      }
+    },
+
+    robustnessSpread: {
+      title: 'Where the builds land',
+      sub: 'The limit that goes over most often, across every simulated build',
+      render(node, ctx) {
+        const r = ctx.robustness;
+        if (!r || !r.available || !r.per_limit || !r.per_limit.length) {
+          node.innerHTML = '<p class="sub">Run the robustness check to see this.</p>';
+          return;
+        }
+        const worst = r.per_limit[0];
+        // Samples arrive in SI; metricValue converts one row, so wrap each in
+        // the shape it expects rather than repeating the unit table here.
+        const toShown = v => metricValue({ [worst.metric]: v }, worst.metric);
+        const shown = (worst.samples || []).map(toShown);
+        const limit = toShown(worst.limit);
+        const over = shown.filter(v => worst.op === '<=' ? v > limit : v < limit);
+        const under = shown.filter(v => worst.op === '<=' ? v <= limit : v >= limit);
+        draw(node, [
+          { x: under, type: 'histogram', name: 'legal',
+            marker: { color: SERIES[0] }, opacity: .85, nbinsx: 44 },
+          { x: over, type: 'histogram', name: 'over the limit',
+            marker: { color: LIMIT }, opacity: .85, nbinsx: 44 }
+        ], {
+          barmode: 'overlay', showlegend: true,
+          shapes: [hline(limit, 'y')].map(sh => Object.assign(sh, {
+            xref: 'x', yref: 'paper', x0: limit, x1: limit, y0: 0, y1: 1,
+            line: { color: LIMIT, width: 1.6, dash: 'dash' } })),
+          xaxis: Object.assign(theme().xaxis, { title: axisTitle(worst.metric) }),
+          yaxis: Object.assign(theme().yaxis, { title: 'builds' })
+        });
+      }
+    },
+
     optionsTable: {
       title: 'All options found',
       sub: 'Click a row to inspect it; export writes a .ric you can open in openMotor',
@@ -408,7 +488,7 @@ const Charts = (() => {
                ['importance', 1]] },
     { id: 'compare',     label: 'Compare & Safety',
       panels: [['compareThrust', 2], ['specSheet', 1], ['grainFlux', 1],
-               ['tornado', 2]] }
+               ['robustness', 1], ['robustnessSpread', 1], ['tornado', 2]] }
   ];
 
   /* ------------------------------------------------------------ fragments */

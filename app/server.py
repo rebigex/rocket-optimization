@@ -22,6 +22,8 @@ from rocketopt.runner import (apply_hardware, build_space, default_spec,
                               describe_design, jsonable)
 from rocketopt.simulate import PA_PER_PSI, curves, simulate_motor
 from rocketopt.sizing import reduction_chain, size_space
+from rocketopt.tolerance import (TOLERANCE_FIELDS, ToleranceSpec,
+                                 default_tolerances, propagate, summarise)
 from rocketopt.spec import (EFFORT_LEVELS, OPTIMISABLE_METRICS, ORDERING_MODES,
                             RunSpec)
 from rocketopt.units import KG_M2S_PER_LB_IN2S, M_PER_IN
@@ -110,6 +112,8 @@ def get_defaults() -> JSONResponse:
         "metrics": OPTIMISABLE_METRICS,
         "ordering_modes": ORDERING_MODES,
         "effort_levels": EFFORT_LEVELS,
+        "tolerance_fields": TOLERANCE_FIELDS,
+        "tolerances": [t.to_dict() for t in default_tolerances()],
         "hardware": {
             "grain_diameter": motor["grains"][0]["properties"]["diameter"],
             "grain_length": motor["grains"][0]["properties"]["length"],
@@ -404,6 +408,30 @@ def export_design(payload: ExportPayload) -> Response:
 class CurvePayload(BaseModel):
     spec: Dict
     x: list
+
+
+class RobustnessRequest(BaseModel):
+    spec: Dict
+    x: list
+    tolerances: list
+    samples: int = 400
+
+
+@app.post("/api/robustness")
+def robustness(payload: RobustnessRequest) -> JSONResponse:
+    """How often this design stays legal once it is actually built."""
+    motor = _require_motor()
+    spec = RunSpec.from_dict(payload.spec)
+    space = build_space(spec, motor)
+    import numpy as np
+
+    built = space.to_motor(np.asarray(payload.x, dtype=float))
+    tolerances = [ToleranceSpec.from_dict(t) for t in payload.tolerances]
+    report = propagate(built, tolerances, spec.enabled_constraints,
+                       samples=max(50, min(int(payload.samples), 2000)),
+                       timestep=spec.search_timestep)
+    report["summary"] = summarise(report)
+    return JSONResponse(jsonable(report))
 
 
 @app.post("/api/curves")

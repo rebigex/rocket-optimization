@@ -324,6 +324,29 @@ table.vars.hardware select {
 .design-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
 .design-actions .chip { cursor: pointer; }
 
+.row.tol { grid-template-columns: auto minmax(0,1fr) auto auto; }
+.row.tol .tol-name { font-size: 12px; color: var(--ink-2); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; cursor: help; }
+.row.tol input[type="text"] { width: 64px; }
+
+.robust { display: flex; flex-direction: column; gap: 12px; }
+.robust .headline { display: flex; align-items: baseline; gap: 10px; }
+.robust .rate { font-family: var(--mono); font-size: 2rem; font-weight: 600;
+  letter-spacing: -.02em; line-height: 1; }
+.robust .rate.bad { color: var(--warn); }
+.robust .rate.ok { color: var(--good); }
+.robust .rate-note { font-size: 11.5px; color: var(--ink-3); }
+.robust .lead { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.robust .bar-row { display: grid; grid-template-columns: 132px 1fr 74px; gap: 10px;
+  align-items: center; font-size: 11.5px; margin-bottom: 7px; }
+.robust .bar-row .label { color: var(--ink-2); }
+.robust .track { display: block; height: 7px; background: var(--line-2);
+  border-radius: 4px; overflow: hidden; }
+.robust .fill { display: block; height: 100%; border-radius: 4px; background: var(--warn); }
+.robust .fill.low { background: #d59b1c; }
+.robust .fill.none { background: var(--good); }
+.robust .pct { font-family: var(--mono); text-align: right; color: var(--ink-2); }
+
 .sizing { margin-top: 10px; }
 .sizing .total {
   font-family: var(--mono); font-size: 1.62rem; font-weight: 600;
