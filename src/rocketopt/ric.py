@@ -75,50 +75,32 @@ for _np_type in (np.float32, np.int32, np.int16, np.bool_):
     )
 
 
-#: The motor the project was built around. Only a preference -- see
-#: :func:`default_motor_path`.
-DEFAULT_MOTOR_NAME = "Current.ric"
-DEFAULT_MOTOR_DIR = ("Data", "Open Motor Data")
+#: Where a motor lives. Whatever .ric sits here is the motor being optimised --
+#: no file name is special, and nothing in this project names one.
+MOTOR_DIR = ("Data", "Open Motor Data")
 
 
-def default_motor_path(root: Path) -> Optional[Path]:
-    """The motor to open when nobody named one.
+def motor_path(root: Path) -> Path:
+    """The motor to work on: whatever .ric is in the motor folder.
 
-    Everything used to hard-code ``Current.ric``. Rename that file and the app
-    boots with nothing loaded and the whole test suite errors out, which is a
-    silly way for a tool to break. Prefer the named file, fall back to any .ric
-    sitting beside it, and let the caller handle "there are none".
+    Drop a file in and it is the one that gets optimised. If several are there
+    the newest wins, since that is the one you just put in, and the app names
+    the file it opened so there is never a question which.
     """
-    folder = root.joinpath(*DEFAULT_MOTOR_DIR)
-    preferred = folder / DEFAULT_MOTOR_NAME
-    if preferred.exists():
-        return preferred
-    if folder.is_dir():
-        for found in sorted(folder.glob("*.ric")):
-            return found
-    return None
-
-
-def study_motor(root: Path) -> Path:
-    """The exact motor the study scripts were written against.
-
-    Deliberately no fallback. These scripts print figures that are quoted in
-    the report and the README; quietly running them against whatever .ric
-    happens to be in the folder would make those numbers describe a different
-    motor than their captions claim.
-    """
-    path = root.joinpath(*DEFAULT_MOTOR_DIR) / DEFAULT_MOTOR_NAME
-    if not path.exists():
-        alternatives = sorted(p.name for p in path.parent.glob("*.ric")) \
-            if path.parent.is_dir() else []
+    found = find_motors(root)
+    if not found:
         raise FileNotFoundError(
-            "{} is missing, and the study scripts are pinned to it so their "
-            "published figures stay reproducible.{}".format(
-                path,
-                "  Found instead: {}.  Either restore the file or pass the "
-                "motor you want explicitly.".format(", ".join(alternatives))
-                if alternatives else ""))
-    return path
+            "No .ric file in {}. Put the motor you want to optimise there, or "
+            "load one from the app.".format(root.joinpath(*MOTOR_DIR)))
+    return found[0]
+
+
+def find_motors(root: Path) -> list:
+    """Every motor in the folder, newest first."""
+    folder = root.joinpath(*MOTOR_DIR)
+    if not folder.is_dir():
+        return []
+    return sorted(folder.glob("*.ric"), key=lambda p: -p.stat().st_mtime)
 
 
 def load_ric(path: str | Path) -> Dict[str, Any]:

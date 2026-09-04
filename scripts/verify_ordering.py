@@ -12,14 +12,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import numpy as np
 
 from rocketopt.design import DesignSpace
-from rocketopt.ric import study_motor, load_ric
+from rocketopt.ric import motor_path, load_ric
 from rocketopt.simulate import simulate_motor
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
-    space = DesignSpace(load_ric(study_motor(ROOT)))
+    space = DesignSpace(load_ric(motor_path(ROOT)))
     rng = np.random.default_rng(0)
     order_free = ("total_impulse", "max_pressure", "burn_time", "isp", "prop_mass")
     failures = 0

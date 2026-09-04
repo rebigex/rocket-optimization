@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from rocketopt import plotting
 from rocketopt.design import DesignSpace
 from rocketopt.optimize import Objective, scale_constraints
-from rocketopt.ric import study_motor, load_ric
+from rocketopt.ric import motor_path, load_ric
 from rocketopt.simulate import PA_PER_PSI, thrust_curve
 from rocketopt.surrogate import TARGETS, Surrogate
 
@@ -45,7 +45,7 @@ def running_best(history, objective, space):
 
 def main() -> None:
     FIGS.mkdir(parents=True, exist_ok=True)
-    base_motor = load_ric(study_motor(ROOT))
+    base_motor = load_ric(motor_path(ROOT))
     space = DesignSpace(base_motor)
     results = json.loads((OUT / "results.json").read_text())
     baseline = results["baseline"]

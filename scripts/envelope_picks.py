@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from rocketopt.design import DesignSpace, SpaceConfig
-from rocketopt.ric import study_motor, load_ric, save_ric
+from rocketopt.ric import motor_path, load_ric, save_ric
 from rocketopt.simulate import PA_PER_PSI, simulate_motor
 from run_envelope import ARRANGEMENTS, ENVELOPE, KG_PER_LB_IN2
 
@@ -18,7 +18,8 @@ OUT = ROOT / "outputs"
 
 
 def main() -> None:
-    base = load_ric(study_motor(ROOT))
+    motor_file = motor_path(ROOT)
+    base = load_ric(motor_file)
     baseline = simulate_motor(base, timestep=0.002)
     front = pd.read_parquet(OUT / "data" / "envelope_fronts.parquet")
 
@@ -66,7 +67,8 @@ def main() -> None:
         })
 
     base_row = {
-        "name": "baseline", "note": "Current.ric as built", "arrangement": "paired",
+        "name": "baseline", "note": "{} as built".format(motor_file.name),
+        "arrangement": "paired",
         "designation": baseline.designation,
         "initial_thrust": baseline.initial_thrust, "d_thrust": 0.0,
         "total_impulse": baseline.total_impulse, "d_impulse": 0.0,
@@ -76,7 +78,7 @@ def main() -> None:
         "port_throat": baseline.port_throat, "isp": baseline.isp,
         "burn_time": baseline.burn_time, "prop_mass": baseline.prop_mass,
         "cores_mm": [40.64, 40.64, 48.26, 48.26, 55.88, 55.88],
-        "throat_mm": 33.02, "exit_mm": 57.15, "file": "Data/Open Motor Data/Current.ric",
+        "throat_mm": 33.02, "exit_mm": 57.15, "file": str(motor_file),
     }
     (OUT / "data" / "envelope_picks.json").write_text(
         json.dumps({"baseline": base_row, "picks": rows}, indent=2))

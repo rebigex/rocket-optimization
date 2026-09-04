@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import numpy as np
 
 from rocketopt.optimize import Objective, pareto_indices, scale_constraints
-from rocketopt.ric import study_motor, load_ric
+from rocketopt.ric import motor_path, load_ric
 from rocketopt.runner import build_objective, build_space, default_spec, timestep_bias
 from rocketopt.sampling import evaluate_batch, sobol_designs
 from rocketopt.simulate import PA_PER_PSI, simulate_motor
@@ -29,7 +29,7 @@ BUDGET = 14400
 
 
 def main() -> None:
-    base = load_ric(study_motor(ROOT))
+    base = load_ric(motor_path(ROOT))
     spec = default_spec(base)
     for var in spec.variables:
         var.step = 0.01 * IN

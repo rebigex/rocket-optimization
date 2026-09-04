@@ -758,12 +758,16 @@ const App = (() => {
       host.innerHTML = '<p class="run-empty">No runs yet — optimize something first.</p>';
       return;
     }
+    // Runs arrive newest first, so the newest finished one is the run just
+    // made: tick that and nothing else. Ticking more would quietly fold an
+    // unrelated earlier run into the report for this optimisation.
+    const newestDone = state.runs.findIndex(j => j.status === 'done');
     host.innerHTML = state.runs.map((j, i) => {
       const done = j.status === 'done';
       const detail = done ? `${j.n_designs} design${j.n_designs === 1 ? '' : 's'} · ${j.elapsed}s`
                           : j.status;
       return `<label class="run-row ${done ? '' : 'busy'}">
-        <input type="checkbox" data-job="${j.id}" ${done && i < 2 ? 'checked' : ''}
+        <input type="checkbox" data-job="${j.id}" ${i === newestDone ? 'checked' : ''}
           ${done ? '' : 'disabled'}>
         <span class="name">${j.label || 'run'}</span>
         <span class="meta">${detail}</span></label>`;
@@ -787,13 +791,12 @@ const App = (() => {
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      // Open it rather than only downloading — a report you cannot see is not done.
+      // Open it rather than only downloading — a report you cannot see is not
+      // done. It is already written to outputs/reports/, so forcing a download
+      // on top of this would just leave a second copy of the same document.
       window.open(url, '_blank');
-      const a = document.createElement('a');
-      a.href = url; a.download = 'motor-report.html';
-      document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 30000);
-      toast('Report written — also saved under outputs/reports/');
+      toast('Report opened — saved as outputs/reports/report.html');
     } finally {
       button.disabled = false; button.textContent = 'Generate report';
     }

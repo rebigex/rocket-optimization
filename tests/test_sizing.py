@@ -12,13 +12,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from rocketopt.ric import default_motor_path, load_ric
+from rocketopt.ric import motor_path, load_ric
 from rocketopt.runner import default_spec
 from rocketopt.sizing import _multiset, _steps, size_space
 from rocketopt.spec import OrderingSpec
 from rocketopt.units import M_PER_IN as IN
 
-MOTOR = default_motor_path(ROOT)
+MOTOR = motor_path(ROOT)
 
 
 @pytest.fixture(scope="module")

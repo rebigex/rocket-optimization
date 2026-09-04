@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from rocketopt.ric import default_motor_path, load_ric, save_ric
+from rocketopt.ric import load_ric, motor_path, save_ric
 from rocketopt.runner import (apply_hardware, build_space, default_spec,
                               describe_design, jsonable)
 from rocketopt.simulate import PA_PER_PSI, curves, simulate_motor
@@ -36,7 +36,6 @@ from .jobs import JobRegistry
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = Path(__file__).resolve().parent / "static"
-DEFAULT_MOTOR = ROOT / "Data" / "Open Motor Data" / "Current.ric"
 
 app = FastAPI(title="Lior's Really Good™ Rocket Optimizer")
 jobs = JobRegistry()
@@ -57,13 +56,14 @@ def _apply(motor: Dict) -> Dict:
 
 
 def _startup_motor() -> Optional[Path]:
-    """The motor to open with.
+    """The motor to open with: whatever .ric is in the motor folder.
 
-    The named default is only a preference. If it has been renamed or moved,
-    any .ric beside it beats booting into an app with nothing loaded and no
-    explanation.
+    No file name is special. Drop a motor in and it is the one that loads.
     """
-    return default_motor_path(ROOT)
+    try:
+        return motor_path(ROOT)
+    except FileNotFoundError:
+        return None
 
 
 def _load_default() -> None:

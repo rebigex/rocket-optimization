@@ -20,7 +20,7 @@ from rocketopt.design import DesignSpace
 from rocketopt.optimize import (Objective, bayes_optimize, best_design,
                                 direct_search, scale_constraints,
                                 surrogate_pareto)
-from rocketopt.ric import study_motor, load_ric, save_ric
+from rocketopt.ric import motor_path, load_ric, save_ric
 from rocketopt.sampling import evaluate_batch
 from rocketopt.simulate import PA_PER_PSI, simulate_motor
 from rocketopt.surrogate import Surrogate
@@ -59,7 +59,8 @@ def summarise(space, x, label, timestep=FINAL_DT):
 
 
 def main() -> None:
-    base_motor = load_ric(study_motor(ROOT))
+    motor_file = motor_path(ROOT)
+    base_motor = load_ric(motor_file)
     space = DesignSpace(base_motor)
     x_base = space.from_motor(base_motor)
 
@@ -69,7 +70,7 @@ def main() -> None:
         baseline_thrust=baseline_search.initial_thrust,
         baseline_impulse=baseline_search.total_impulse,
     )
-    baseline = summarise(space, x_base, "baseline (Current.ric)")
+    baseline = summarise(space, x_base, "baseline ({})".format(motor_file.name))
     print("baseline: {} | initial thrust {:.0f} N | impulse {:.0f} N·s | peak {:.0f} psi".format(
         baseline["designation"], baseline["initial_thrust"],
         baseline["total_impulse"], baseline["max_pressure_psi"]))

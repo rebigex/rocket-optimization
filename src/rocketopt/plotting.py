@@ -89,7 +89,8 @@ def thrust_curves(curves: Dict[str, tuple], path: Path, title: str) -> Path:
 
 
 def pareto_front(front: pd.DataFrame, baseline: Dict, path: Path,
-                 cloud: Optional[pd.DataFrame] = None) -> Path:
+                 cloud: Optional[pd.DataFrame] = None,
+                 baseline_label: str = "baseline motor") -> Path:
     """Initial thrust against total impulse, with the baseline motor marked."""
     apply_style()
     fig, ax = plt.subplots(figsize=(7.5, 5))
@@ -102,7 +103,7 @@ def pareto_front(front: pd.DataFrame, baseline: Dict, path: Path,
             markeredgewidth=1.2, zorder=3, label="Pareto front (simulated)")
     ax.scatter([baseline["total_impulse"]], [baseline["initial_thrust"]],
                s=110, color=SERIES[1], edgecolors=SURFACE, linewidths=1.5,
-               zorder=4, label="baseline Current.ric", marker="D")
+               zorder=4, label=baseline_label, marker="D")
     ax.annotate("baseline", xy=(baseline["total_impulse"], baseline["initial_thrust"]),
                 xytext=(10, -14), textcoords="offset points",
                 color=SERIES[1], fontsize=9, fontweight="600")

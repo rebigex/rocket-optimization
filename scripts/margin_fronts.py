@@ -16,7 +16,7 @@ import pandas as pd
 
 from rocketopt.design import DesignSpace, SpaceConfig
 from rocketopt.optimize import Objective, surrogate_pareto
-from rocketopt.ric import study_motor, load_ric, save_ric
+from rocketopt.ric import motor_path, load_ric, save_ric
 from rocketopt.simulate import PA_PER_PSI, simulate_motor
 from rocketopt.surrogate import Surrogate
 
@@ -32,7 +32,7 @@ def main() -> None:
     exit_max = float(sys.argv[1]) if len(sys.argv) > 1 else SpaceConfig.exit_max
     suffix = "" if exit_max == SpaceConfig.exit_max else "_exit{:.0f}".format(1000 * exit_max)
 
-    base_motor = load_ric(study_motor(ROOT))
+    base_motor = load_ric(motor_path(ROOT))
     space = DesignSpace(base_motor, SpaceConfig(exit_max=exit_max))
     surrogate = Surrogate.load(OUT / "models", space)
     baseline = simulate_motor(space.to_motor(space.from_motor(base_motor)), 0.002)

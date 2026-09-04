@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from rocketopt.ric import study_motor, load_ric, save_ric
+from rocketopt.ric import motor_path, load_ric, save_ric
 from rocketopt.runner import build_space, default_spec, run
 from rocketopt.simulate import PA_PER_PSI
 from rocketopt.spec import ConstraintSpec
@@ -23,7 +23,7 @@ OUT = ROOT / "outputs" / "big"
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    base = load_ric(study_motor(ROOT))
+    base = load_ric(motor_path(ROOT))
 
     spec = default_spec(base)
     for var in spec.variables:

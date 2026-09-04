@@ -12,8 +12,8 @@ import numpy as np
 
 from rocketopt import plotting
 from rocketopt.plotting import GRID, INK, INK_SOFT, LIMIT, SERIES, SURFACE
-from rocketopt.ric import study_motor, load_ric
-from rocketopt.simulate import curves
+from rocketopt.ric import motor_path, load_ric
+from rocketopt.simulate import PA_PER_PSI, curves
 from rocketopt.units import M_PER_IN as IN
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +29,18 @@ def main() -> None:
     front = sorted(B["designs"], key=lambda d: d["total_impulse"])
     baseline = B["baseline"]
 
+    # The caption used to name a file and quote two numbers measured on it.
+    # Both come from the run that was actually loaded, so the figure describes
+    # whatever motor is in the folder rather than one particular file.
+    motor_file = motor_path(ROOT)
+    limits = {c["metric"]: c["value"] for c in B["spec"]["constraints"]
+              if c.get("enabled", True)}
+    over = (baseline.get("max_pressure", 0) > limits.get("max_pressure", float("inf"))
+            or baseline.get("peak_kn", 0) > limits.get("peak_kn", float("inf")))
+    baseline_note = "your {} as saved\n{:.0f} psi \u00b7 Kn {:.0f}{}".format(
+        motor_file.name, baseline["max_pressure"] / PA_PER_PSI, baseline["peak_kn"],
+        " \u2014 outside the limits" if over else "")
+
     # --- the trade-off curve -------------------------------------------------
     fig, ax = plt.subplots(figsize=(8.4, 5.4))
     ax.plot([d["total_impulse"] for d in front], [d["initial_thrust"] for d in front],
@@ -42,7 +54,7 @@ def main() -> None:
                     fontsize=9, fontweight="700", color=SERIES[0])
     ax.scatter([baseline["total_impulse"]], [baseline["initial_thrust"]], s=130,
                marker="D", color=LIMIT, edgecolors=SURFACE, linewidths=1.5, zorder=5)
-    ax.annotate("your Current.ric as saved\n860 psi · Kn 323 — outside the limits",
+    ax.annotate(baseline_note,
                 xy=(baseline["total_impulse"], baseline["initial_thrust"]),
                 xytext=(-16, -46), textcoords="offset points", ha="right",
                 fontsize=9, color=LIMIT, fontweight="600",
@@ -72,7 +84,7 @@ def main() -> None:
 
     # --- why the fixed nozzle cannot work -----------------------------------
     import math
-    base = load_ric(study_motor(ROOT))
+    base = load_ric(motor_path(ROOT))
     At = math.pi * base["nozzle"]["throat"] ** 2 / 4
     d_in = np.linspace(0.3, 4.6, 200)
     d = d_in * IN
