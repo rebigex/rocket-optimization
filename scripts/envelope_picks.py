@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from rocketopt.design import DesignSpace, SpaceConfig
-from rocketopt.ric import load_ric, save_ric
+from rocketopt.ric import study_motor, load_ric, save_ric
 from rocketopt.simulate import PA_PER_PSI, simulate_motor
 from run_envelope import ARRANGEMENTS, ENVELOPE, KG_PER_LB_IN2
 
@@ -18,7 +18,7 @@ OUT = ROOT / "outputs"
 
 
 def main() -> None:
-    base = load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric")
+    base = load_ric(study_motor(ROOT))
     baseline = simulate_motor(base, timestep=0.002)
     front = pd.read_parquet(OUT / "data" / "envelope_fronts.parquet")
 

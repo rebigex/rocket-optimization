@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from rocketopt.ric import load_ric
+from rocketopt.ric import study_motor, load_ric
 from rocketopt.runner import default_spec, run
 from rocketopt.simulate import PA_PER_PSI
 from rocketopt.spec import ConstraintSpec
@@ -23,7 +23,7 @@ SEEDS = (17, 101, 2027)
 
 
 def main() -> None:
-    base = load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric")
+    base = load_ric(study_motor(ROOT))
     out = []
     for seed in SEEDS:
         spec = default_spec(base)

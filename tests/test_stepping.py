@@ -16,12 +16,12 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from rocketopt.design import DesignSpace, SpaceConfig
 from rocketopt.optimize import Objective, scale_constraints
-from rocketopt.ric import load_ric
+from rocketopt.ric import default_motor_path, load_ric
 from rocketopt.spec import ConstraintSpec, OrderingSpec, VariableSpec
 from rocketopt.units import parse_number, round_up_to_step, snap
 
 IN = 0.0254
-MOTOR = ROOT / "Data" / "Open Motor Data" / "Current.ric"
+MOTOR = default_motor_path(ROOT)
 
 
 @pytest.fixture(scope="module")
@@ -189,9 +189,31 @@ def test_worker_spec_rebuilds_an_identical_space(base):
 # ----------------------------------------------------- legacy compatibility
 
 
+def space_containing(motor):
+    """A space whose box actually holds the motor it was built from.
+
+    The default :class:`SpaceConfig` carries fixed bounds that were tuned for
+    one particular motor. A baseline outside them is clamped to the bound --
+    correct behaviour, but it makes "does this round-trip" untestable. Derive
+    the box from the motor instead, so these tests check the mechanics rather
+    than one file's dimensions.
+    """
+    cores = [g["properties"]["coreDiameter"] for g in motor["grains"]]
+    outer = motor["grains"][0]["properties"]["diameter"]
+    throat = motor["nozzle"]["throat"]
+    exit_d = motor["nozzle"]["exit"]
+    return SpaceConfig(
+        core_min=min(cores) * 0.5,
+        core_max=min(max(cores) * 1.25, outer * 0.95),
+        throat_min=throat * 0.5,
+        throat_max=throat * 1.5,
+        exit_max=max(exit_d * 1.25, throat * 2.0),
+    )
+
+
 def test_the_baseline_still_round_trips_exactly(base):
     """The study scripts depend on this being lossless."""
-    space = DesignSpace(base)
+    space = DesignSpace(base, space_containing(base))
     motor = space.to_motor(space.from_motor(base))
     assert motor["nozzle"]["throat"] == pytest.approx(base["nozzle"]["throat"])
     assert motor["nozzle"]["exit"] == pytest.approx(base["nozzle"]["exit"], abs=1e-9)
@@ -202,7 +224,7 @@ def test_the_baseline_still_round_trips_exactly(base):
 
 def test_analytic_features_match_the_simulator(base):
     from rocketopt.simulate import simulate_motor
-    space = DesignSpace(base)
+    space = DesignSpace(base, space_containing(base))
     features = dict(zip(space.feature_names, space.features(space.from_motor(base))[0]))
     metrics = simulate_motor(base, timestep=0.002)
     assert features["kn_0"] == pytest.approx(metrics.initial_kn, rel=1e-4)

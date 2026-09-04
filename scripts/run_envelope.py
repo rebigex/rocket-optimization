@@ -28,7 +28,7 @@ from rocketopt.design import DesignSpace, SpaceConfig
 from rocketopt.optimize import (Objective, direct_search, pareto_indices,
                                 scale_constraints, surrogate_pareto)
 from rocketopt.sampling import evaluate_batch
-from rocketopt.ric import load_ric, save_ric
+from rocketopt.ric import study_motor, load_ric, save_ric
 from rocketopt.simulate import PA_PER_PSI, simulate_motor
 from rocketopt.surrogate import Surrogate
 
@@ -76,7 +76,7 @@ def describe(space, x, label):
 
 
 def main() -> None:
-    base = load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric")
+    base = load_ric(study_motor(ROOT))
     reference_space = DesignSpace(base, SpaceConfig(**ENVELOPE))
     baseline = simulate_motor(base, timestep=0.002)
     objective_base = dict(baseline_thrust=baseline.initial_thrust,

@@ -20,7 +20,7 @@ from rocketopt.design import DesignSpace
 from rocketopt.optimize import (Objective, bayes_optimize, best_design,
                                 direct_search, scale_constraints,
                                 surrogate_pareto)
-from rocketopt.ric import load_ric, save_ric
+from rocketopt.ric import study_motor, load_ric, save_ric
 from rocketopt.sampling import evaluate_batch
 from rocketopt.simulate import PA_PER_PSI, simulate_motor
 from rocketopt.surrogate import Surrogate
@@ -59,7 +59,7 @@ def summarise(space, x, label, timestep=FINAL_DT):
 
 
 def main() -> None:
-    base_motor = load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric")
+    base_motor = load_ric(study_motor(ROOT))
     space = DesignSpace(base_motor)
     x_base = space.from_motor(base_motor)
 

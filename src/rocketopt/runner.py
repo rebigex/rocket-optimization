@@ -38,6 +38,13 @@ TelemetryFn = Callable[[Dict], None]
 #: usefully show at a glance, and the payload is polled once a second.
 TELEMETRY_POINTS = 160
 
+#: A single-objective search still has a population worth watching, but a
+#: scatter needs two axes. The objective goes on y and the first of these that
+#: is not already the objective goes on x -- it only frames the view, it never
+#: enters the search.
+COMPANION_METRICS = ("total_impulse", "initial_thrust", "isp", "burn_time",
+                     "max_pressure")
+
 #: Small extra tightening on every limit during the search, on top of the
 #: measured timestep correction, because that correction was calibrated on one
 #: motor and the search visits many.
@@ -54,10 +61,20 @@ def _noop_telemetry(snapshot: Dict) -> None:
 
 def _snapshot(frame: pd.DataFrame, objective: Objective, space: DesignSpace,
               metrics: List[str], generation: int, seed_index: int,
-              n_seeds: int) -> Optional[Dict]:
+              n_seeds: int, surrogate: bool = False) -> Optional[Dict]:
     """One generation of the search, in the units the axes are labelled in."""
-    if frame is None or not len(frame) or len(metrics) < 2:
+    if frame is None or not len(frame) or not metrics:
         return None
+    single = len(metrics) < 2
+    if single:
+        # Optimising one metric is the app's default, and it used to mean no
+        # live view at all. Borrow a second axis so the population has somewhere
+        # to spread; "best so far" is then a single point rather than a front.
+        companion = next((m for m in COMPANION_METRICS
+                          if m != metrics[0] and m in frame.columns), None)
+        if companion is None:
+            return None
+        metrics = [metrics[0], companion]
     violation = scale_constraints(frame, objective, space).max(axis=1)
     feasible = frame["ok"].to_numpy(dtype=bool) & (violation <= 0)
     x = frame[metrics[1]].to_numpy(dtype=float)
@@ -90,6 +107,8 @@ def _snapshot(frame: pd.DataFrame, objective: Objective, space: DesignSpace,
         "points": [[float(x[i]), float(y[i]), bool(feasible[i])] for i in order],
         "front": [[float(a), float(b)] for a, b in front],
         "feasible_fraction": float(feasible.mean()),
+        "single_objective": bool(single),
+        "surrogate": bool(surrogate),
         "best": [float(y[feasible].max()), float(x[feasible].max())]
                 if feasible.any() else None,
     }
@@ -524,12 +543,17 @@ def run(spec: RunSpec, base_motor: Dict, on_progress: ProgressFn = _noop,
     history = pd.DataFrame()
     front = pd.DataFrame()
     n_obj = len(spec.enabled_objectives)
+    #: Wall time spent on real simulations only, so the app can quote a rate
+    #: that means something. Surrogate work is deliberately excluded.
+    sim_seconds = 0.0
 
     if spec.mode == "pareto":
         on_progress("sampling", 0.06, "Sampling the design space")
+        sampling_started = time.time()
         dataset = generate_mixed_dataset(space, budget["samples"],
                                          timestep=spec.search_timestep,
                                          seed=spec.seed, workers=workers)
+        sim_seconds = time.time() - sampling_started
         history = dataset
         on_progress("training", 0.42, "Training surrogate models")
         surrogate = Surrogate(space, kind="gbt", seed=spec.seed)
@@ -549,15 +573,34 @@ def run(spec: RunSpec, base_motor: Dict, on_progress: ProgressFn = _noop,
         # Without this loop the seed count is silently ignored here and the run
         # spends one seed's share of the budget instead of all of it.
         fronts = []
+        labels = objective.objective_labels
         for index in range(n_seeds):
             on_progress("search", 0.58 + 0.30 * index / n_seeds,
                         "Mapping the trade-off: search {} of {}".format(
                             index + 1, n_seeds))
+
+            def tick(algorithm, index=index):
+                """Same live view as the simulator path, over predictions."""
+                done = getattr(algorithm, "n_gen", 0) or 0
+                within = min(done / max(budget["gen"], 1), 1.0)
+                on_progress("search", 0.58 + 0.30 * (index + within) / n_seeds,
+                            "Mapping the trade-off: search {} of {}, "
+                            "generation {} of {}".format(
+                                index + 1, n_seeds,
+                                min(int(done), budget["gen"]), budget["gen"]))
+                frame = getattr(getattr(algorithm, "problem", None),
+                                "last_frame", None)
+                snap = _snapshot(frame, objective, space, labels, done, index,
+                                 n_seeds, surrogate=True)
+                if snap is not None:
+                    snap["total_generations"] = int(budget["gen"])
+                    on_telemetry(snap)
+
             out = surrogate_pareto(
                 space, surrogate, objective, pop_size=budget["pop"],
                 n_gen=budget["gen"], timestep=spec.verify_timestep,
                 workers=workers, seed=int(spec.seed) + 1009 * index,
-                seed_designs=starts, reference=dataset)
+                seed_designs=starts, reference=dataset, callback=tick)
             found = out.get("front", pd.DataFrame())
             if len(found):
                 fronts.append(found)
@@ -569,9 +612,11 @@ def run(spec: RunSpec, base_motor: Dict, on_progress: ProgressFn = _noop,
             {"seed": int(spec.seed) + 1009 * i, "designs": int(len(f))}
             for i, f in enumerate(fronts)]
     else:
+        search_started = time.time()
         searched = _multi_seed_search(space, objective, spec, budget,
                                       baseline_x, n_obj, workers, on_progress,
                                       on_telemetry)
+        sim_seconds = time.time() - search_started
         front = searched["front"]
         history = searched["history"]
         result.stats["per_seed"] = searched["per_seed"]
@@ -592,6 +637,14 @@ def run(spec: RunSpec, base_motor: Dict, on_progress: ProgressFn = _noop,
     result.stats = {
         **result.stats,
         "simulations": int(len(history)),
+        # Only from a window that is purely simulation. A multi-objective
+        # search on the simulator verifies its front at the fine timestep
+        # inside that window, and those runs are not in `history`, so the
+        # ratio would read low and drag every later estimate with it.
+        "sim_rate": (round(len(history) / sim_seconds
+                           * (max(spec.search_timestep, 0.002) / 0.01) ** -0.75, 2)
+                     if (sim_seconds > 0.5 and len(history)
+                         and (spec.mode == "pareto" or n_obj == 1)) else None),
         "seeds": int(budget.get("seeds", 1)),
         "budget": int(budget.get("total", 0)),
         "seconds": round(time.time() - started, 1),

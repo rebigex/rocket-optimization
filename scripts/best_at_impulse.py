@@ -15,7 +15,7 @@ import numpy as np
 
 from rocketopt.design import DesignSpace, SpaceConfig
 from rocketopt.optimize import Objective, direct_search
-from rocketopt.ric import load_ric, save_ric
+from rocketopt.ric import study_motor, load_ric, save_ric
 from rocketopt.simulate import PA_PER_PSI, simulate_motor
 from run_envelope import ARRANGEMENTS, ENVELOPE, KG_PER_LB_IN2, VERIFY_DT
 
@@ -35,7 +35,7 @@ class ThrustAtImpulse(Objective):
 
 
 def main() -> None:
-    base = load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric")
+    base = load_ric(study_motor(ROOT))
     print("maximise initial thrust subject to impulse >= {:.0f} N·s\n".format(BASE_IMPULSE))
     for label, overrides in ARRANGEMENTS.items():
         space = DesignSpace(base, SpaceConfig(**ENVELOPE, **overrides))

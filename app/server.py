@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import io
 import tempfile
+import threading
+import time
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -17,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from rocketopt.ric import load_ric, save_ric
+from rocketopt.ric import default_motor_path, load_ric, save_ric
 from rocketopt.runner import (apply_hardware, build_space, default_spec,
                               describe_design, jsonable)
 from rocketopt.simulate import PA_PER_PSI, curves, simulate_motor
@@ -54,10 +56,22 @@ def _apply(motor: Dict) -> Dict:
     return apply_hardware(motor, **HARDWARE) if HARDWARE else motor
 
 
+def _startup_motor() -> Optional[Path]:
+    """The motor to open with.
+
+    The named default is only a preference. If it has been renamed or moved,
+    any .ric beside it beats booting into an app with nothing loaded and no
+    explanation.
+    """
+    return default_motor_path(ROOT)
+
+
 def _load_default() -> None:
-    if DEFAULT_MOTOR.exists():
-        STATE["motor"] = _apply(load_ric(DEFAULT_MOTOR))
-        STATE["name"] = DEFAULT_MOTOR.name
+    path = _startup_motor()
+    if path is None:
+        return
+    STATE["motor"] = _apply(load_ric(path))
+    STATE["name"] = path.name
 
 
 _load_default()
@@ -148,9 +162,10 @@ def set_hardware(payload: Hardware) -> JSONResponse:
 def reset_hardware() -> JSONResponse:
     """Drops every override and reloads the motor exactly as its file has it."""
     HARDWARE.clear()
-    if DEFAULT_MOTOR.exists():
-        STATE["motor"] = load_ric(DEFAULT_MOTOR)
-        STATE["name"] = DEFAULT_MOTOR.name
+    path = _startup_motor()
+    if path is not None:
+        STATE["motor"] = load_ric(path)
+        STATE["name"] = path.name
     return get_defaults()
 
 
@@ -283,26 +298,141 @@ def apply_tighter_bounds(payload: ApplyBounds) -> JSONResponse:
                          "changes": tight.get("changes", [])})
 
 
+#: openMotor runs per second at a 0.01 s timestep. Only a starting guess --
+#: :func:`_calibrate` measures the real figure on this machine at startup, and
+#: every finished run replaces it with what actually happened.
+THROUGHPUT: Dict = {"rate": 45.0, "source": "assumed"}
+
+#: A surrogate evaluation is a model call, not a burn. Measured on the gradient
+#: boosted models this app trains, batched as NSGA-II evaluates them.
+SURROGATE_RATE = 12000.0
+
+#: Fitting the models and computing permutation importances, end to end.
+SURROGATE_OVERHEAD = 90.0
+
+#: Everything that is not a simulation: spinning up a process pool for each
+#: phase, ranking the survivors, building the curves the panels draw. Roughly
+#: flat, and it dominates a short run the way simulation dominates a long one.
+FIXED_OVERHEAD = 22.0
+
+
+def _calibrate() -> None:
+    """Times real simulations of the loaded motor, once, off the request path.
+
+    The estimate used to quote a constant measured on one machine years of
+    hardware ago. Simulation cost is dominated by how many timesteps a burn
+    takes, which is a property of this motor on this CPU, so measure it.
+    """
+    motor = STATE.get("motor")
+    if motor is None:
+        return
+    try:
+        from rocketopt.sampling import evaluate_batch, mixed_designs
+
+        # Time designs drawn from the space, not the loaded motor repeated.
+        # A search spends most of its life on motors that are nothing like the
+        # baseline -- a 0.5 in core in a 5 in grain has twice the web and burns
+        # for far longer, and a simulation costs what its burn costs. Measuring
+        # the baseline alone read an order of magnitude too fast.
+        space = build_space(default_spec(motor), motor)
+
+        def timed(n: int) -> float:
+            X = mixed_designs(space, n, seed=n)
+            started = time.time()
+            evaluate_batch(space, X, timestep=0.01)
+            return time.time() - started
+
+        # evaluate_batch spins up a fresh process pool per call, and on macOS
+        # that spawn costs more than the simulations do at these sizes. Timing
+        # two batch sizes and taking the slope cancels the fixed cost.
+        # Big enough to catch the slow tail: a design with a 0.5 in core burns
+        # for seconds while the baseline burns for a fraction of one, and the
+        # mean cost is dominated by those. A 16-design sample rarely draws one
+        # and read four times too fast.
+        small, large = 32, 192
+        t_small, t_large = timed(small), timed(large)
+        slope = (t_large - t_small) / float(large - small)
+        if slope > 0:
+            THROUGHPUT.update(rate=min(max(1.0 / slope, 2.0), 200.0),
+                              source="measured")
+    except Exception:
+        pass  # an estimate is a courtesy; never let it break the app
+
+
+def _start_calibration() -> None:
+    threading.Thread(target=_calibrate, name="calibrate", daemon=True).start()
+
+
+_start_calibration()
+
+
+def _rate_at(timestep: float) -> float:
+    """Simulations per second at a given timestep.
+
+    Cost scales with the number of steps in a burn, so a finer timestep is
+    slower, not faster.
+
+    Deliberately the startup calibration alone. Feeding finished runs back in
+    here as well as into the per-shape correction gave two loops chasing the
+    same error: a sampling run would set a slow global rate, every other kind
+    of run would inherit it, and their corrections would then fight it. One
+    stable base rate plus one correction per shape converges; two do not.
+    """
+    return max(THROUGHPUT["rate"] * (max(timestep, 0.002) / 0.01) ** 0.75, 1.0)
+
+
+def _sim_rate(spec: RunSpec) -> float:
+    return _rate_at(spec.search_timestep)
+
+
+def _shape(spec: RunSpec) -> str:
+    """Runs of the same shape have the same non-simulation costs."""
+    return "{}:{}".format(spec.mode,
+                          "multi" if len(spec.enabled_objectives) > 1 else "single")
+
+
 def _estimate(spec: RunSpec) -> Dict:
     """Rough wall-clock, so nobody starts a five-minute run by accident."""
     budget = spec.budget
-    sims = budget["total"]
-    if spec.mode == "pareto":
-        sims += budget["samples"]
+    free = max(1, sum(1 for v in spec.variables if v.free))
     # Verification re-runs the survivors at the fine timestep, and the
     # sensitivity sweep costs two more per free dimension.
-    free = max(1, sum(1 for v in spec.variables if v.free))
-    sims += 60 + 2 * free
-    # Measured: ~32 designs/second on a 12-worker pool at a 0.01 s timestep.
-    # Cost scales with the number of steps in a burn, so a finer timestep is
-    # slower, not faster.
-    rate = 32.0 * (max(spec.search_timestep, 0.002) / 0.01) ** 0.75
-    seconds = sims / max(rate, 1.0)
+    verified = 60 + 2 * free
+    predicted, overhead = 0, FIXED_OVERHEAD
+
     if spec.mode == "pareto":
-        seconds += 90  # surrogate training and permutation importance
-    return {"simulations": int(sims), "seconds": int(seconds),
+        # The search runs against the trained models, so the budget buys
+        # predictions rather than burns. Charging them at the simulator's rate
+        # is what made a 200k run quote an hour and finish in fifteen minutes.
+        searched = budget["samples"]
+        predicted = budget["total"]
+        overhead += SURROGATE_OVERHEAD
+    else:
+        searched = budget["total"]
+        if len(spec.enabled_objectives) > 1:
+            # A multi-objective search verifies its front at the fine timestep
+            # once per seed, not just once at the end.
+            verified += 40 * budget["seeds"]
+
+    real = searched + verified
+    # Verification runs at the fine timestep, which is several times slower per
+    # simulation than the search. Charging it at the search rate understated
+    # every short run.
+    seconds = (searched / _sim_rate(spec)
+               + verified / _rate_at(spec.verify_timestep)
+               + predicted / SURROGATE_RATE + overhead)
+    # Corrected by how far off this kind of run turned out to be last time.
+    seconds *= jobs.factor(_shape(spec))
+    return {"simulations": int(real + predicted), "seconds": int(seconds),
             "seeds": budget["seeds"], "pop": budget["pop"], "gen": budget["gen"],
-            "per_seed": budget["per_seed"]}
+            "per_seed": budget["per_seed"],
+            "openmotor_runs": int(real), "model_runs": int(predicted),
+            "rate": round(_sim_rate(spec), 1),
+            "rate_source": THROUGHPUT["source"],
+            "correction": round(jobs.factor(_shape(spec)), 2),
+            # A run of this shape has finished, so the figure is anchored to
+            # something that actually happened rather than a short benchmark.
+            "calibrated": jobs.has_seen(_shape(spec))}
 
 
 @app.post("/api/run")
@@ -312,7 +442,8 @@ def start_run(payload: SpecPayload) -> JSONResponse:
     problems = spec.validate()
     if problems:
         raise HTTPException(400, "; ".join(problems))
-    job = jobs.start(spec, motor)
+    job = jobs.start(spec, motor, predicted=_estimate(spec)["seconds"],
+                     shape=_shape(spec))
     return JSONResponse(job.status_dict())
 
 

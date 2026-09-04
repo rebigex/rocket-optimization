@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import pandas as pd
 
 from rocketopt.design import DesignSpace, SpaceConfig
-from rocketopt.ric import load_ric
+from rocketopt.ric import study_motor, load_ric
 from rocketopt.sampling import evaluate_batch, rejection_designs
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,7 +25,7 @@ ENVELOPE = dict(max_pressure=500 * PSI, max_mass_flux=1.05 * 703.0696, max_kn=22
 
 def main() -> None:
     n_new = int(sys.argv[1]) if len(sys.argv) > 1 else 8192
-    base = load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric")
+    base = load_ric(study_motor(ROOT))
     space = DesignSpace(base, SpaceConfig(**ENVELOPE))
 
     # Peak Kn always exceeds initial Kn, so screen on a band that brackets the

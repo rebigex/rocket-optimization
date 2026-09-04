@@ -84,7 +84,21 @@ const App = (() => {
   }
 
   async function loadDefaults(payload) {
-    const data = payload || await (await fetch('/api/defaults')).json();
+    let data = payload;
+    if (!data) {
+      const res = await fetch('/api/defaults');
+      data = await res.json();
+      if (!res.ok || !data.spec) {
+        // Without this the page dereferences an error body and dies silently,
+        // leaving the header stuck on "loading…" with nothing to explain it.
+        $('#chipName').textContent = 'no motor loaded';
+        $('#emptyState').hidden = false;
+        $('#emptyState').innerHTML =
+          `<h2>No motor loaded</h2><p>${data.detail || 'Could not read the default motor.'}
+           Use <strong>Change</strong> in the header to pick a <code>.ric</code> file.</p>`;
+        return;
+      }
+    }
     state.spec = data.spec;
     state.motor = data.motor;
     state.metrics = data.metrics;
@@ -522,9 +536,22 @@ const App = (() => {
            front. Independent searches disagree by several percent, so merging
            several beats one long run at the same cost.`
         : '';
-      $('#estimate').textContent = est.simulations
-        ? `about ${est.simulations.toLocaleString()} simulations · roughly ${fmtDuration(est.seconds)}`
-        : '';
+      if (!est.simulations) {
+        $('#estimate').innerHTML = '';
+      } else if (est.model_runs) {
+        // Predictions and burns cost wildly different amounts; quoting one
+        // total made a surrogate run look an hour long when it takes minutes.
+        $('#estimate').innerHTML =
+          `roughly <strong>${fmtDuration(est.seconds)}</strong> &middot;
+           ${est.openmotor_runs.toLocaleString()} openMotor runs plus
+           ${est.model_runs.toLocaleString()} model evaluations
+           <span class="rate">${estQuality(est)}</span>`;
+      } else {
+        $('#estimate').innerHTML =
+          `roughly <strong>${fmtDuration(est.seconds)}</strong> &middot;
+           ${est.openmotor_runs.toLocaleString()} openMotor runs
+           <span class="rate">${estQuality(est)}</span>`;
+      }
     }, 220);
   }
 
@@ -609,10 +636,21 @@ const App = (() => {
     toast(what ? `Narrowed ${what} — nothing legal was removed` : 'Already as tight as it gets');
   }
 
+  // Say how much the number is worth. Before a run of this kind has finished,
+  // it comes from a short benchmark and a design that burns for seconds costs
+  // far more than one that burns for a fraction of one, so it is only rough.
+  function estQuality(est) {
+    return est.calibrated
+      ? '(calibrated on your last run of this kind)'
+      : '(rough until you have run one of these)';
+  }
+
   function fmtDuration(seconds) {
     if (!seconds) return 'a moment';
     if (seconds < 90) return Math.round(seconds) + ' s';
-    return Math.round(seconds / 60) + ' min';
+    if (seconds < 5400) return Math.round(seconds / 60) + ' min';
+    const h = Math.floor(seconds / 3600), m = Math.round((seconds % 3600) / 60);
+    return m ? `${h} h ${m} min` : `${h} h`;
   }
 
   /* --------------------------------------------------------- run + poll */
@@ -662,9 +700,17 @@ const App = (() => {
     $('#liveTitle').textContent = t.n_seeds > 1
       ? `Search ${t.seed_index + 1} of ${t.n_seeds}`
       : 'Searching';
+    // The claim "actually been simulated" is only true on the simulator path;
+    // in trade-off mode these are model predictions, verified later.
+    const dot = t.surrogate
+      ? 'Every dot is a motor the trained model has scored — the winners get '
+        + 'simulated for real at the end.'
+      : 'Every dot is a motor that has actually been simulated.';
+    const best = t.single_objective
+      ? 'the orange marker is the best one found so far.'
+      : 'the orange line is the best trade-off found so far.';
     $('#liveSub').textContent =
-      'Every dot is a motor that has actually been simulated. Grey broke a limit; '
-      + 'blue met them all; the orange line is the best trade-off found so far.';
+      `${dot} Grey broke a limit; blue met them all; ${best}`;
 
     const stats = [
       ['generation', `${gen}/${total}`, ''],

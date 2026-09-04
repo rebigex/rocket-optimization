@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from rocketopt import plotting
-from rocketopt.ric import load_ric
+from rocketopt.ric import study_motor, load_ric
 from rocketopt.simulate import PA_PER_PSI, simulate_motor, thrust_curve
 from run_envelope import KG_PER_LB_IN2
 
@@ -45,7 +45,7 @@ def measure(path, name, note):
 
 
 def main() -> None:
-    base_path = ROOT / "Data" / "Open Motor Data" / "Current.ric"
+    base_path = study_motor(ROOT)
     baseline = measure(base_path, "baseline", "Current.ric, as built")
 
     designs = [baseline]

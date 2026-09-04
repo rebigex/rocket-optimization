@@ -12,7 +12,7 @@ import numpy as np
 
 from rocketopt import plotting
 from rocketopt.plotting import GRID, INK, INK_SOFT, LIMIT, SERIES, SURFACE
-from rocketopt.ric import load_ric
+from rocketopt.ric import study_motor, load_ric
 from rocketopt.simulate import curves
 from rocketopt.units import M_PER_IN as IN
 
@@ -72,7 +72,7 @@ def main() -> None:
 
     # --- why the fixed nozzle cannot work -----------------------------------
     import math
-    base = load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric")
+    base = load_ric(study_motor(ROOT))
     At = math.pi * base["nozzle"]["throat"] ** 2 / 4
     d_in = np.linspace(0.3, 4.6, 200)
     d = d_in * IN

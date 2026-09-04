@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import pandas as pd
 
 from rocketopt.design import DesignSpace
-from rocketopt.ric import load_ric
+from rocketopt.ric import study_motor, load_ric
 from rocketopt.surrogate import TARGETS, Surrogate, compare_models
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +16,7 @@ OUT = ROOT / "outputs"
 
 
 def main() -> None:
-    space = DesignSpace(load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric"))
+    space = DesignSpace(load_ric(study_motor(ROOT)))
     frame = pd.read_parquet(OUT / "data" / "designs.parquet")
     print("dataset: {} designs, {} simulated cleanly, {} feasible".format(
         len(frame), int(frame.ok.sum()), int(frame.feasible.sum())))

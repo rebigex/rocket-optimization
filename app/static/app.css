@@ -437,3 +437,5 @@ table.vars.hardware select {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+.estimate .rate { color: var(--ink-3); font-size: 11px; white-space: nowrap; }

@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import numpy as np
 
-from rocketopt.ric import load_ric, save_ric
+from rocketopt.ric import study_motor, load_ric, save_ric
 from rocketopt.runner import default_spec, run
 from rocketopt.spec import ConstraintSpec
 from rocketopt.units import KG_M2S_PER_LB_IN2S as LB
@@ -50,7 +50,7 @@ def build(base, free_nozzle: bool):
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    base = load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric")
+    base = load_ric(study_motor(ROOT))
 
     for key, free_nozzle in (("A_cores_only", False), ("B_cores_and_nozzle", True)):
         spec = build(base, free_nozzle)

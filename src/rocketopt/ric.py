@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 import yaml
@@ -73,6 +73,52 @@ for _np_type in (np.float32, np.int32, np.int16, np.bool_):
         _np_type,
         lambda dumper, data: dumper.represent_data(data.item()),
     )
+
+
+#: The motor the project was built around. Only a preference -- see
+#: :func:`default_motor_path`.
+DEFAULT_MOTOR_NAME = "Current.ric"
+DEFAULT_MOTOR_DIR = ("Data", "Open Motor Data")
+
+
+def default_motor_path(root: Path) -> Optional[Path]:
+    """The motor to open when nobody named one.
+
+    Everything used to hard-code ``Current.ric``. Rename that file and the app
+    boots with nothing loaded and the whole test suite errors out, which is a
+    silly way for a tool to break. Prefer the named file, fall back to any .ric
+    sitting beside it, and let the caller handle "there are none".
+    """
+    folder = root.joinpath(*DEFAULT_MOTOR_DIR)
+    preferred = folder / DEFAULT_MOTOR_NAME
+    if preferred.exists():
+        return preferred
+    if folder.is_dir():
+        for found in sorted(folder.glob("*.ric")):
+            return found
+    return None
+
+
+def study_motor(root: Path) -> Path:
+    """The exact motor the study scripts were written against.
+
+    Deliberately no fallback. These scripts print figures that are quoted in
+    the report and the README; quietly running them against whatever .ric
+    happens to be in the folder would make those numbers describe a different
+    motor than their captions claim.
+    """
+    path = root.joinpath(*DEFAULT_MOTOR_DIR) / DEFAULT_MOTOR_NAME
+    if not path.exists():
+        alternatives = sorted(p.name for p in path.parent.glob("*.ric")) \
+            if path.parent.is_dir() else []
+        raise FileNotFoundError(
+            "{} is missing, and the study scripts are pinned to it so their "
+            "published figures stay reproducible.{}".format(
+                path,
+                "  Found instead: {}.  Either restore the file or pass the "
+                "motor you want explicitly.".format(", ".join(alternatives))
+                if alternatives else ""))
+    return path
 
 
 def load_ric(path: str | Path) -> Dict[str, Any]:

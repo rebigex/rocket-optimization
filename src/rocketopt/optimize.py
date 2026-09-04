@@ -481,6 +481,10 @@ class _SurrogateProblem(Problem):
                 predicted["avg_pressure"] = features["pressure_0"].to_numpy()
             out["F"] = self.objective.matrix(predicted)
             out["G"] = scale_constraints(predicted, self.objective, self.space)
+            # Kept for the per-generation callback, exactly as the simulator
+            # problem does it -- these are predictions, not simulations, and
+            # the snapshot is flagged as such.
+            self.last_frame = predicted
             return
         out["F"] = np.column_stack(
             [-pred["initial_thrust"].to_numpy(), -pred["total_impulse"].to_numpy()]
@@ -512,6 +516,7 @@ def surrogate_pareto(
     seed: int = 0,
     seed_designs: Optional[np.ndarray] = None,
     reference: Optional[pd.DataFrame] = None,
+    callback=None,
 ) -> Dict:
     """Maps the initial-thrust / impulse trade-off, then verifies it.
 
@@ -540,7 +545,8 @@ def surrogate_pareto(
     else:
         sampling = LHS()
     algorithm = NSGA2(pop_size=pop_size, sampling=sampling, eliminate_duplicates=True)
-    result = minimize(problem, algorithm, ("n_gen", n_gen), seed=seed, verbose=False)
+    result = minimize(problem, algorithm, ("n_gen", n_gen), seed=seed, verbose=False,
+                      **_callback_kwargs(callback))
 
     if result.X is None:
         return {"front": pd.DataFrame(), "predicted": pd.DataFrame()}

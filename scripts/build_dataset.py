@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from rocketopt.design import DesignSpace
-from rocketopt.ric import load_ric
+from rocketopt.ric import study_motor, load_ric
 from rocketopt.sampling import generate_mixed_dataset
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,7 +14,7 @@ N = int(sys.argv[1]) if len(sys.argv) > 1 else 16384
 
 
 def main() -> None:
-    space = DesignSpace(load_ric(ROOT / "Data" / "Open Motor Data" / "Current.ric"))
+    space = DesignSpace(load_ric(study_motor(ROOT)))
     started = time.time()
     frame = generate_mixed_dataset(space, N, timestep=0.02, seed=7, workers=12)
     elapsed = time.time() - started
