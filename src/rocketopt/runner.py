@@ -30,6 +30,13 @@ from .surrogate import Surrogate
 from .units import KG_M2S_PER_LB_IN2S, M_PER_IN
 
 ProgressFn = Callable[[str, float, str], None]
+#: Called once per generation with a snapshot of the live population, so a UI
+#: can show the search happening instead of a bar creeping across.
+TelemetryFn = Callable[[Dict], None]
+
+#: Points sent per generation. A population of 240 is more than a scatter can
+#: usefully show at a glance, and the payload is polled once a second.
+TELEMETRY_POINTS = 160
 
 #: Small extra tightening on every limit during the search, on top of the
 #: measured timestep correction, because that correction was calibrated on one
@@ -39,6 +46,53 @@ SEARCH_SAFETY_MARGIN = 0.005
 
 def _noop(stage: str, fraction: float, message: str) -> None:
     pass
+
+
+def _noop_telemetry(snapshot: Dict) -> None:
+    pass
+
+
+def _snapshot(frame: pd.DataFrame, objective: Objective, space: DesignSpace,
+              metrics: List[str], generation: int, seed_index: int,
+              n_seeds: int) -> Optional[Dict]:
+    """One generation of the search, in the units the axes are labelled in."""
+    if frame is None or not len(frame) or len(metrics) < 2:
+        return None
+    violation = scale_constraints(frame, objective, space).max(axis=1)
+    feasible = frame["ok"].to_numpy(dtype=bool) & (violation <= 0)
+    x = frame[metrics[1]].to_numpy(dtype=float)
+    y = frame[metrics[0]].to_numpy(dtype=float)
+
+    order = np.arange(len(frame))
+    if len(order) > TELEMETRY_POINTS:
+        # Keep every feasible design and thin the rest -- the feasible ones are
+        # what the front is made of, and they are usually the minority.
+        keep = np.flatnonzero(feasible)
+        rest = np.flatnonzero(~feasible)
+        room = max(TELEMETRY_POINTS - len(keep), 0)
+        if len(rest) > room:
+            rest = rest[np.linspace(0, len(rest) - 1, room).round().astype(int)]
+        order = np.concatenate([keep, rest])[:TELEMETRY_POINTS]
+
+    front: List[List[float]] = []
+    if feasible.any():
+        good = frame[feasible]
+        picked = pareto_indices(-objective.matrix(good))
+        pts = np.column_stack([good[metrics[1]].to_numpy(dtype=float)[picked],
+                               good[metrics[0]].to_numpy(dtype=float)[picked]])
+        front = pts[np.argsort(pts[:, 0])].tolist()
+
+    return {
+        "generation": int(generation),
+        "seed_index": int(seed_index),
+        "n_seeds": int(n_seeds),
+        "metrics": [metrics[1], metrics[0]],
+        "points": [[float(x[i]), float(y[i]), bool(feasible[i])] for i in order],
+        "front": [[float(a), float(b)] for a, b in front],
+        "feasible_fraction": float(feasible.mean()),
+        "best": [float(y[feasible].max()), float(x[feasible].max())]
+                if feasible.any() else None,
+    }
 
 
 def jsonable(value):
@@ -432,7 +486,8 @@ def _population(history: pd.DataFrame, objective: Objective, space: DesignSpace,
 
 
 def run(spec: RunSpec, base_motor: Dict, on_progress: ProgressFn = _noop,
-        workers: Optional[int] = None) -> RunResult:
+        workers: Optional[int] = None,
+        on_telemetry: TelemetryFn = _noop_telemetry) -> RunResult:
     problems = spec.validate()
     if problems:
         raise ValueError("; ".join(problems))
@@ -515,7 +570,8 @@ def run(spec: RunSpec, base_motor: Dict, on_progress: ProgressFn = _noop,
             for i, f in enumerate(fronts)]
     else:
         searched = _multi_seed_search(space, objective, spec, budget,
-                                      baseline_x, n_obj, workers, on_progress)
+                                      baseline_x, n_obj, workers, on_progress,
+                                      on_telemetry)
         front = searched["front"]
         history = searched["history"]
         result.stats["per_seed"] = searched["per_seed"]
@@ -584,7 +640,8 @@ def _alternatives(space: DesignSpace, history: pd.DataFrame,
 
 def _multi_seed_search(space: DesignSpace, objective: Objective, spec: RunSpec,
                        budget: Dict, baseline_x: np.ndarray, n_obj: int,
-                       workers, on_progress) -> Dict:
+                       workers, on_progress,
+                       on_telemetry: TelemetryFn = _noop_telemetry) -> Dict:
     """Several independent searches, merged into one front.
 
     A genetic search converges on whichever basin its starting population
@@ -601,12 +658,19 @@ def _multi_seed_search(space: DesignSpace, objective: Objective, spec: RunSpec,
         seed = int(spec.seed) + 1009 * index      # spread, not consecutive
         label = "search {} of {}".format(index + 1, n_seeds)
 
+        labels = objective.objective_labels
+
         def tick(algorithm, index=index, label=label):
             done = getattr(algorithm, "n_gen", 0) or 0
             within = min(done / max(budget["gen"], 1), 1.0)
             on_progress("search", 0.08 + 0.80 * (index + within) / n_seeds,
                         "{}: generation {} of {}".format(
                             label, min(int(done), budget["gen"]), budget["gen"]))
+            frame = getattr(getattr(algorithm, "problem", None), "last_frame", None)
+            snap = _snapshot(frame, objective, space, labels, done, index, n_seeds)
+            if snap is not None:
+                snap["total_generations"] = int(budget["gen"])
+                on_telemetry(snap)
 
         if n_obj > 1:
             out = direct_pareto(

@@ -80,7 +80,7 @@ const App = (() => {
     const params = new URLSearchParams(location.search);
     if (params.get('profile')) state.profile = params.get('profile');
     const job = params.get('job');
-    if (job) { state.jobId = job; await loadResults(); }
+    if (job) await attachToRun(job);
   }
 
   async function loadDefaults(payload) {
@@ -628,23 +628,69 @@ const App = (() => {
     $('#progress').hidden = false;
     $('#btnRun').disabled = true;
     $('#runLabel').textContent = 'Working…';
+    // Hand the workspace over to the live view for the duration.
+    Charts.resetLive();
+    state.results = null;
+    $('#emptyState').hidden = true;
+    $('#panels').hidden = true;
+    $('#live').hidden = false;
+    $('#liveStats').innerHTML = '';
+    $('#liveNote').textContent = 'Waiting for the first generation…';
     state.poll = setInterval(pollJob, 900);
   }
 
   async function pollJob() {
     if (!state.jobId) return;
-    const res = await fetch('/api/jobs/' + state.jobId);
+    const res = await fetch('/api/jobs/' + state.jobId + '/live');
     if (!res.ok) return;
     const job = await res.json();
+    if (job.telemetry) renderLive(job.telemetry);
     $('#progressFill').style.width = (job.fraction * 100).toFixed(1) + '%';
     $('#progressMsg').textContent = job.message + '  ·  ' + job.elapsed + 's';
     if (job.status === 'done') { finishRun(); await loadResults(); }
-    else if (job.status === 'failed') { finishRun(); toast(job.error || 'Run failed.'); }
-    else if (job.status === 'cancelled') { finishRun(); toast('Run cancelled.'); }
+    else if (job.status === 'failed') {
+      finishRun(); $('#emptyState').hidden = false;
+      toast(job.error || 'Run failed.');
+    } else if (job.status === 'cancelled') {
+      finishRun(); $('#emptyState').hidden = false; toast('Run cancelled.');
+    }
+  }
+
+  function renderLive(t) {
+    const gen = t.generation || 0;
+    const total = t.total_generations || 0;
+    $('#liveTitle').textContent = t.n_seeds > 1
+      ? `Search ${t.seed_index + 1} of ${t.n_seeds}`
+      : 'Searching';
+    $('#liveSub').textContent =
+      'Every dot is a motor that has actually been simulated. Grey broke a limit; '
+      + 'blue met them all; the orange line is the best trade-off found so far.';
+
+    const stats = [
+      ['generation', `${gen}/${total}`, ''],
+      ['legal', `${Math.round(100 * (t.feasible_fraction || 0))}%`, ''],
+    ];
+    if (t.best) {
+      stats.push([Charts.metricLabel(t.metrics[1]),
+                  Math.round(t.best[0]).toLocaleString(), 'accent']);
+      stats.push([Charts.metricLabel(t.metrics[0]),
+                  Math.round(t.best[1]).toLocaleString(), 'accent']);
+    }
+    $('#liveStats').innerHTML = stats.map(([k, v, cls]) =>
+      `<div class="live-stat"><span class="k">${k}</span>
+       <span class="v ${cls}">${v}</span></div>`).join('');
+
+    try { Charts.liveFrame($('#livePlot'), t); } catch (e) { console.error(e); }
+    try { Charts.liveSpark($('#liveSpark'), t.trace); } catch (e) { console.error(e); }
+    $('#liveNote').textContent = t.trace && t.trace.length > 1
+      ? 'Best ' + Charts.metricLabel(t.metrics[1]).toLowerCase() + ' found so far, '
+        + 'across every generation of this run.'
+      : '';
   }
 
   function finishRun() {
     clearInterval(state.poll); state.poll = null;
+    $('#live').hidden = true;
     $('#progress').hidden = true;
     $('#btnRun').disabled = false;
     $('#runLabel').textContent = 'Optimize';
@@ -705,6 +751,28 @@ const App = (() => {
     } finally {
       button.disabled = false; button.textContent = 'Generate report';
     }
+  }
+
+  async function attachToRun(id) {
+    // A run can be reopened while it is still going, not only once it is done.
+    const res = await fetch('/api/jobs/' + id + '/live');
+    if (!res.ok) { toast('That run is no longer held.'); return; }
+    const job = await res.json();
+    state.jobId = id;
+    if (job.status === 'done') { await loadResults(); return; }
+    if (job.status === 'running' || job.status === 'queued') {
+      Charts.resetLive();
+      $('#emptyState').hidden = true;
+      $('#panels').hidden = true;
+      $('#live').hidden = false;
+      $('#progress').hidden = false;
+      $('#btnRun').disabled = true;
+      $('#runLabel').textContent = 'Working…';
+      if (job.telemetry) renderLive(job.telemetry);
+      state.poll = setInterval(pollJob, 900);
+      return;
+    }
+    toast('That run ' + job.status + '.');
   }
 
   async function loadResults() {

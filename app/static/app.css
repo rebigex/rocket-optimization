@@ -281,6 +281,30 @@ table.vars.hardware select {
 .empty-preview { background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
 
+/* ---------------------------------------------------------- live search */
+.live {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px 18px 14px; box-shadow: var(--shadow);
+}
+.live-head { display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 20px; flex-wrap: wrap; }
+.live-head h3 { font-size: 14px; }
+.live-head .sub { font-size: 11.5px; color: var(--ink-3); margin: 2px 0 0; }
+.live-stats { display: flex; gap: 22px; }
+.live-stat { text-align: right; }
+.live-stat .k { display: block; font-family: var(--mono); font-size: 9.5px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.live-stat .v { display: block; font-family: var(--mono); font-size: 16px;
+  font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.live-stat .v.accent { color: var(--accent); }
+.live-plot { width: 100%; height: 460px; margin-top: 10px; }
+.live-foot { display: grid; grid-template-columns: 340px 1fr; gap: 18px;
+  align-items: center; margin-top: 6px; }
+.live-spark { height: 46px; border-left: 2px solid var(--line);
+  padding-left: 10px; }
+.live-foot .sub { font-size: 11.5px; color: var(--ink-3); margin: 0; }
+@media (prefers-reduced-motion: reduce) { .live-plot { height: 380px; } }
+
 .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 900px) { .panels { grid-template-columns: 1fr; } }
 .panel {

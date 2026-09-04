@@ -53,6 +53,11 @@ class Job:
     result: Optional[RunResult] = None
     spec: Optional[RunSpec] = None
     label: str = ""
+    #: Latest generation snapshot, plus a short scalar history. Replaced rather
+    #: than appended so the poll payload stays a fixed size however long the
+    #: search runs.
+    telemetry: Optional[Dict] = None
+    trace: List[Dict] = field(default_factory=list)
     _cancel: threading.Event = field(default_factory=threading.Event)
 
     def status_dict(self) -> Dict:
@@ -108,6 +113,20 @@ class JobRegistry:
             while len(self._order) > self.keep:
                 self._jobs.pop(self._order.pop(0), None)
 
+        def telemetry(snapshot: Dict) -> None:
+            history = job.trace
+            best = snapshot.get("best")
+            if best is not None:
+                history.append({"seed": snapshot["seed_index"],
+                                "gen": snapshot["generation"],
+                                "a": best[0], "b": best[1]})
+                # A long run would otherwise accumulate thousands of points that
+                # no sparkline can show; thin the oldest half when it gets big.
+                if len(history) > 600:
+                    del history[: len(history) // 2]
+            snapshot["trace"] = history[-240:]
+            job.telemetry = snapshot
+
         def progress(stage: str, fraction: float, message: str) -> None:
             if job._cancel.is_set():
                 # The optimiser has no cancel hook of its own, so raising out of
@@ -119,7 +138,7 @@ class JobRegistry:
             job.status = "running"
             try:
                 job.result = run(spec, base_motor, on_progress=progress,
-                                 workers=workers)
+                                 workers=workers, on_telemetry=telemetry)
                 job.status, job.stage, job.fraction = "done", "done", 1.0
                 job.message = "Finished"
             except Exception as exc:  # surfaced to the user, not swallowed

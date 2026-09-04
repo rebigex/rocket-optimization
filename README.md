@@ -93,6 +93,14 @@ brute force would take — on a 0.01 in grid with all nine dimensions free that 
 line. `sizing.py` carries the combinatorics; `tests/test_sizing.py` checks the formulas
 against brute-force enumeration.
 
+**Watch it search.** After Optimize, the workspace shows the live population rather than
+a progress bar: every dot is a motor that has actually been simulated, grey if it broke a
+limit and blue if it did not, with the current best trade-off drawn through them and a
+fading wake of the last dozen generations so you can see which way the search is
+travelling. It reads the real evaluated population in real units, not a stand-in
+animation, and the whole payload is under 3 KB a second. A run can be reopened while it
+is still going with `?job=<id>`.
+
 **Tolerance analysis.** The optimiser works from nominal dimensions, so every design it
 returns sits exactly on whatever limits you set. Compare & Safety will build that design
 a few hundred times with your shop's tolerances applied — core diameters varying

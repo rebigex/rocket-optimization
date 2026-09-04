@@ -228,6 +228,10 @@ class _SimulatorProblem(Problem):
         frame = evaluate_batch(self.space, X, timestep=self.timestep,
                                workers=self.workers, pool=self.pool)
         self.history.append(frame)
+        # Kept so a per-generation callback can report what the population
+        # actually is, in real units, without re-deriving it from pymoo's
+        # normalised objective matrix.
+        self.last_frame = frame
         if self.n_obj == 1:
             score = self.objective.score_frame(frame)
             score = np.where(frame["ok"].to_numpy(), score, -1e3)

@@ -362,6 +362,17 @@ def job_status(job_id: str) -> JSONResponse:
     return JSONResponse(job.status_dict())
 
 
+@app.get("/api/jobs/{job_id}/live")
+def job_live(job_id: str) -> JSONResponse:
+    """The search as it stands right now, for the waiting screen."""
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "No such run.")
+    status = job.status_dict()
+    status["telemetry"] = job.telemetry
+    return JSONResponse(jsonable(status))
+
+
 @app.post("/api/jobs/{job_id}/cancel")
 def job_cancel(job_id: str) -> JSONResponse:
     if not jobs.cancel(job_id):

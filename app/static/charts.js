@@ -687,6 +687,76 @@ const Charts = (() => {
       <tbody>${rows}</tbody></table></div>`;
   }
 
+  /* ------------------------------------------------- the search, live */
+
+  const LIVE = { ghosts: [], lastSeed: -1 };
+
+  function resetLive() { LIVE.ghosts = []; LIVE.lastSeed = -1; }
+
+  function liveFrame(node, snap) {
+    const [ax, ay] = snap.metrics;
+    // A new seed starts somewhere else entirely; carrying its predecessor's
+    // trail over would read as one search teleporting.
+    if (snap.seed_index !== LIVE.lastSeed) { LIVE.ghosts = []; LIVE.lastSeed = snap.seed_index; }
+
+    const feas = snap.points.filter(p => p[2]);
+    const infeas = snap.points.filter(p => !p[2]);
+    LIVE.ghosts.push(feas.map(p => [p[0], p[1]]));
+    if (LIVE.ghosts.length > 14) LIVE.ghosts.shift();
+
+    // Older generations fade out, so the population leaves a wake and you can
+    // see which way the search is travelling.
+    const trails = LIVE.ghosts.slice(0, -1).map((g, i) => ({
+      x: g.map(p => p[0]), y: g.map(p => p[1]), mode: 'markers', type: 'scatter',
+      marker: { size: 4, color: SERIES[0],
+                opacity: 0.05 + 0.16 * (i / Math.max(LIVE.ghosts.length - 1, 1)) },
+      hoverinfo: 'skip', showlegend: false
+    }));
+
+    const traces = trails.concat([
+      { x: infeas.map(p => p[0]), y: infeas.map(p => p[1]), mode: 'markers',
+        name: 'over a limit', type: 'scatter',
+        marker: { size: 5, color: css('--ink-3'), opacity: .38 }, hoverinfo: 'skip' },
+      { x: feas.map(p => p[0]), y: feas.map(p => p[1]), mode: 'markers',
+        name: 'legal', type: 'scatter',
+        marker: { size: 7, color: SERIES[0], opacity: .9,
+                  line: { color: css('--surface'), width: 1 } }, hoverinfo: 'skip' },
+      { x: snap.front.map(p => p[0]), y: snap.front.map(p => p[1]),
+        mode: 'lines+markers', name: 'best so far', type: 'scatter',
+        line: { color: SERIES[1], width: 2 },
+        marker: { size: 7, color: SERIES[1], line: { color: css('--surface'), width: 1 } },
+        hoverinfo: 'skip' }
+    ]);
+
+    Plotly.react(node, traces, Object.assign(theme(), {
+      showlegend: true,
+      transition: { duration: 320, easing: 'cubic-in-out' },
+      margin: { l: 62, r: 18, t: 8, b: 44 },
+      xaxis: Object.assign(theme().xaxis, { title: axisTitle(ax) }),
+      yaxis: Object.assign(theme().yaxis, { title: axisTitle(ay) })
+    }), { displayModeBar: false, responsive: true });
+  }
+
+  function liveSpark(node, trace) {
+    if (!trace || trace.length < 2) { node.innerHTML = ''; return; }
+    const running = [];
+    let best = -Infinity;
+    trace.forEach(t => { best = Math.max(best, t.a); running.push(best); });
+    // Best-so-far only ever climbs, and it climbs within a narrow band. Filling
+    // to zero would paint the whole box solid and hide every step.
+    const lo = Math.min(...running), hi = Math.max(...running);
+    const pad = Math.max((hi - lo) * 0.18, Math.abs(hi) * 0.004, 1e-6);
+    Plotly.react(node, [{
+      y: running, mode: 'lines', type: 'scatter',
+      line: { color: SERIES[1], width: 2, shape: 'hv' }, hoverinfo: 'skip'
+    }], Object.assign(theme(), {
+      margin: { l: 0, r: 0, t: 6, b: 6 }, showlegend: false,
+      xaxis: { visible: false },
+      yaxis: { visible: false, range: [lo - pad, hi + pad] }
+    }), { displayModeBar: false, responsive: true, staticPlot: true });
+  }
+
   return { PANELS, PROFILES, theme, draw, metricValue, metricLabel, axisTitle,
+           liveFrame, liveSpark, resetLive,
            crossSectionSVG, parallelSVG, deltaTable };
 })();
