@@ -174,7 +174,12 @@ def ensure(root: Path = ROOT, assume_yes: bool = False,
             raise SystemExit(
                 "  Run scripts/setup_env.sh, or python bootstrap.py --yes,\n"
                 "  to build it without being asked.\n")
-        if input("  Build it now? [Y/n] ").strip().lower() in ("n", "no"):
+        try:
+            answer = input("  Build it now? [Y/n] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            # Ctrl-D or Ctrl-C at the prompt is an answer, not a crash.
+            raise SystemExit("\n  Nothing was changed.")
+        if answer in ("n", "no"):
             raise SystemExit("  Nothing was changed.")
     print()
     return build(root)
