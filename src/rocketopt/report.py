@@ -17,6 +17,7 @@ import base64
 import html
 import json
 import math
+import tempfile
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -47,17 +48,21 @@ N_OPTIONS = 7
 
 
 class ReportFiles(NamedTuple):
-    """What a finished report leaves on disk.
+    """What a finished report leaves on disk: one file.
 
-    ``pdf`` is the artefact -- it is what gets handed over. ``html`` is the
-    source it was rendered from, kept because it is the readable form and the
-    only one that can be re-rendered. ``pdf`` is None only when no browser was
-    available to render with, and ``pdf_error`` then says so.
+    ``pdf`` is the report. ``html`` is set only when no browser was available to
+    render one, in which case the HTML is the report instead and ``pdf_error``
+    says what went wrong. Exactly one of the two is ever populated.
     """
 
-    html: Path
     pdf: Optional[Path] = None
+    html: Optional[Path] = None
     pdf_error: str = ""
+
+    @property
+    def path(self) -> Path:
+        """The file to hand over, whichever form it took."""
+        return self.pdf or self.html
 
 
 @dataclass
@@ -380,10 +385,16 @@ def data_uri(path: Path) -> str:
 
 
 def build_report(runs: Sequence[ReportRun], base_motor: Dict, out_dir: Path,
-                 title: Optional[str] = None) -> ReportFiles:
+                 title: Optional[str] = None,
+                 figures_dir: Optional[Path] = None) -> ReportFiles:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    figures = make_figures(runs, base_motor, out_dir / "figures")
+    staging_dir = tempfile.TemporaryDirectory(prefix="rocketopt-report-")
+    staging = Path(staging_dir.name)
+    # Figures are embedded in the page either way; a caller that wants them as
+    # files too (outputs/ mirrors the last run) says where they should land.
+    figures = make_figures(runs, base_motor,
+                           Path(figures_dir) if figures_dir else staging / "figures")
 
     grain = base_motor["grains"][0]["properties"]
     nozzle = base_motor["nozzle"]
@@ -400,16 +411,24 @@ def build_report(runs: Sequence[ReportRun], base_motor: Dict, out_dir: Path,
 
     document = "<title>{}</title>\n{}\n<style>{}</style>\n<div class=\"wrap\">{}</div>".format(
         esc(title), FONT_LINK, CSS, "\n".join(body))
-    path = out_dir / "report.html"
-    path.write_text(document)
 
-    # A report is a document people file and email, so the artefact is a PDF.
-    # If nothing can render one, say why rather than failing the whole report --
-    # the HTML beside it is still complete.
+    # A report is a document people file and email, so the artefact is a PDF and
+    # the PDF is the only thing left behind. The HTML is scaffolding -- figures
+    # are embedded in it as data URIs, so neither it nor the PNGs beside it are
+    # needed once it has been rendered, and leaving them turns the folder into a
+    # pile of near-duplicates of the same document.
+    source = staging / "report.html"
+    source.write_text(document)
     try:
-        return ReportFiles(html=path, pdf=html_to_pdf(path, out_dir / "report.pdf"))
-    except (NoBrowser, OSError, ValueError) as exc:
-        return ReportFiles(html=path, pdf=None, pdf_error=str(exc))
+        try:
+            return ReportFiles(pdf=html_to_pdf(source, out_dir / "report.pdf"))
+        except (NoBrowser, OSError, ValueError) as exc:
+            # Nothing to render with, so the HTML *is* the report: keep it.
+            fallback = out_dir / "report.html"
+            fallback.write_text(document)
+            return ReportFiles(html=fallback, pdf=None, pdf_error=str(exc))
+    finally:
+        staging_dir.cleanup()
 
 
 def _default_title(runs: Sequence[ReportRun], base_motor: Dict) -> str:

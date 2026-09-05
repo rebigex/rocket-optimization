@@ -14,9 +14,7 @@ scripts/setup_env.sh              # venv, deps, openMotor, tests
 
 ![The optimizer](docs/screenshot.png)
 
-**[Field guide](docs/guide.html)** ([PDF](docs/Optimizer-Field-Guide.pdf)) — how to drive it.
-**[Worked study](docs/five-inch-study.pdf)** ([HTML](docs/five-inch-study.html)) — two optimisations of a 5-inch motor, one of
-which provably has no answer.
+**[Field guide](docs/Optimizer-Field-Guide.pdf)** ([HTML source](docs/guide.html)) — how to drive it.
 
 Everything reported is simulated, never predicted: a surrogate may propose and the search
 may run at a coarse timestep, but every design that reaches you has been re-run in
@@ -156,8 +154,9 @@ Generate. The document is written from the runs themselves — hardware and limi
 the motor and the spec, and the trade-off curve and option tables built from the
 verified designs. A run that found nothing gets the most attention: which limit could never be met, how close anything got, and — where
 burning area is closed-form — a proof that no core diameter would have worked, with the
-throat diameter that would. Two runs in one report are compared side by side. Output
-lands in `outputs/reports/` and opens in a new tab.
+throat diameter that would. Two runs in one report are compared side by side. It is
+written as a PDF to `reports/` and opens in a new tab. That folder ships empty — what
+lands in it is your report about your motor, and is not committed.
 
 **Four visualization profiles**, switchable from the tab strip:
 
@@ -185,8 +184,11 @@ scripts/setup_env.sh                          # venv, deps, openMotor, tests
 .venv/bin/python -m pytest tests/ -q
 ```
 
-Outputs land in `outputs/`: `results.json`, `figures/*.png`, and `motors/*.ric`
-files you can open directly in openMotor.
+`outputs/` mirrors the **last** optimisation and nothing else — it is emptied and
+rewritten every run, so a file in it always describes the motor you just optimised.
+You get `result.json` (spec, limits, every legal design, statistics), `motors/*.ric`
+you can open directly in openMotor, and `figures/*.png`. Nothing in it is source and
+none of it is committed; run the optimiser again and it all comes back.
 
 ## Where the machine learning actually earns its keep
 
@@ -231,7 +233,9 @@ src/rocketopt/
   report_style.py  the report stylesheet, kept as data
   plotting.py    figures for the static report
 tests/           machining grid, frozen dimensions, ordering rules
-docs/            the field guide, the worked study, recommended motors
+docs/            the field guide -- documentation, not generated artefacts
+reports/         ships empty; your reports land here, and are never committed
+outputs/         the last run's data, rewritten every run, never committed
 vendor/openMotor cloned at setup, GPLv3, never committed
 ```
 

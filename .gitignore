@@ -2,6 +2,11 @@
 # the scripts; none of it is source.
 outputs/
 
+# Reports are what *you* generate about *your* motor. The folder is committed so
+# the app has somewhere to write on a fresh clone; its contents never are.
+reports/*
+!reports/.gitkeep
+
 # openMotor is GPLv3 and is cloned by scripts/setup_env.sh, not redistributed here.
 vendor/
 

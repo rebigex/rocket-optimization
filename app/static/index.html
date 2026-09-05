@@ -167,20 +167,19 @@
       </div>
     </section>
 
-    <section class="card" id="reportCard">
-      <div class="card-head">
-        <h2>Technical report</h2>
-        <button type="button" class="link" id="btnRefreshRuns">refresh</button>
-      </div>
-      <p class="hint">Tick the runs to write up. Two runs are compared side by side &mdash;
-        a run that found nothing gets a section explaining why.</p>
-      <div class="runs" id="runList"></div>
-      <div class="field">
-        <label for="reportTitle">Title <span style="color:var(--ink-3)">(optional)</span></label>
-        <input type="text" id="reportTitle" placeholder="named from the motor class if blank">
-      </div>
+    <section class="card" id="reportCard" hidden>
+      <h2>Design sheets</h2>
+      <p class="hint">Every run writes its own report as soon as it finishes &mdash;
+        the whole curve, which limit binds, and why. This is the other document:
+        one sheet per design, with the numbers you would machine to, zipped so you
+        can send the set.</p>
       <div class="design-actions">
-        <button type="button" class="chip" id="btnReport">Generate report</button>
+        <button type="button" class="chip" id="btnReportOpen">Open this run&rsquo;s report</button>
+        <button type="button" class="chip" id="btnBundle">Download every design (.zip)</button>
+      </div>
+      <div class="bundle-progress" id="bundleProgress" hidden>
+        <div class="bar"><div class="fill" id="bundleFill"></div></div>
+        <span class="meta" id="bundleMsg"></span>
       </div>
     </section>
 

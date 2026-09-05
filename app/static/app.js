@@ -14,7 +14,7 @@ const App = (() => {
     spec: null, motor: null, metrics: {}, orderingModes: {}, effortLevels: {},
     unit: 'in', jobId: null, poll: null, results: null, runs: [],
     tolerances: null, toleranceFields: {}, robustness: null,
-    profile: 'design', selected: 0, baselineCurves: null
+    profile: 'design', selected: 0, baselineCurves: null, reportJob: null
   };
 
   /* ------------------------------------------------------------- numbers */
@@ -112,7 +112,6 @@ const App = (() => {
     renderHardware();
     renderConfig();
     renderEmptyPreview();
-    refreshRuns();
     validate();
   }
 
@@ -136,8 +135,8 @@ const App = (() => {
     $('#btnRun').addEventListener('click', startRun);
     $('#btnHardware').addEventListener('click', applyHardware);
     $('#btnHardwareReset').addEventListener('click', resetHardware);
-    $('#btnRefreshRuns').addEventListener('click', refreshRuns);
-    $('#btnReport').addEventListener('click', generateReport);
+    $('#btnReportOpen').addEventListener('click', openReport);
+    $('#btnBundle').addEventListener('click', downloadBundle);
     $('#btnCancel').addEventListener('click', cancelRun);
     $('#btnLoad').addEventListener('click', () => $('#fileInput').click());
     $('#fileInput').addEventListener('change', onFilePicked);
@@ -685,7 +684,12 @@ const App = (() => {
     if (job.telemetry) renderLive(job.telemetry);
     $('#progressFill').style.width = (job.fraction * 100).toFixed(1) + '%';
     $('#progressMsg').textContent = job.message + '  ·  ' + job.elapsed + 's';
-    if (job.status === 'done') { finishRun(); await loadResults(); }
+    if (job.status === 'done') {
+      finishRun();
+      // The report was written as part of the run; surface it and the sheets.
+      showReportCard(job);
+      await loadResults();
+    }
     else if (job.status === 'failed') {
       finishRun(); $('#emptyState').hidden = false;
       toast(job.error || 'Run failed.');
@@ -747,67 +751,74 @@ const App = (() => {
     await fetch('/api/jobs/' + state.jobId + '/cancel', { method: 'POST' });
   }
 
-  /* ------------------------------------------------------- report picker */
+  /* ------------------------------------------------- report & sheets */
 
-  async function refreshRuns() {
-    const res = await fetch('/api/jobs');
-    if (!res.ok) return;
-    state.runs = await res.json();
-    const host = $('#runList');
-    if (!state.runs.length) {
-      host.innerHTML = '<p class="run-empty">No runs yet — optimize something first.</p>';
-      return;
-    }
-    // Runs arrive newest first, so the newest finished one is the run just
-    // made: tick that and nothing else. Ticking more would quietly fold an
-    // unrelated earlier run into the report for this optimisation.
-    const newestDone = state.runs.findIndex(j => j.status === 'done');
-    host.innerHTML = state.runs.map((j, i) => {
-      const done = j.status === 'done';
-      const detail = done ? `${j.n_designs} design${j.n_designs === 1 ? '' : 's'} · ${j.elapsed}s`
-                          : j.status;
-      return `<label class="run-row ${done ? '' : 'busy'}">
-        <input type="checkbox" data-job="${j.id}" ${i === newestDone ? 'checked' : ''}
-          ${done ? '' : 'disabled'}>
-        <span class="name">${j.label || 'run'}</span>
-        <span class="meta">${detail}</span></label>`;
-    }).join('');
+  // A run writes its own report when it finishes, so there is nothing here that
+  // builds one. What is left is getting at it, and at the per-design sheets.
+
+  function showReportCard(job) {
+    const card = $('#reportCard');
+    const ready = job && job.status === 'done';
+    card.hidden = !ready;
+    if (!ready) return;
+    state.reportJob = job.id;
+    const open = $('#btnReportOpen');
+    open.disabled = !job.report;
+    open.textContent = job.report
+      ? "Open this run's report"
+      : (job.report_error ? 'Report could not be written' : 'No report');
+    $('#btnBundle').disabled = !job.n_designs;
   }
 
-  async function generateReport() {
-    const ids = Array.from(document.querySelectorAll('#runList input:checked'))
-      .map(b => b.dataset.job);
-    if (!ids.length) { toast('Tick at least one finished run.'); return; }
-    const button = $('#btnReport');
-    button.disabled = true; button.textContent = 'Writing…';
-    try {
-      const res = await fetch('/api/report', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_ids: ids, title: $('#reportTitle').value || null })
-      });
-      if (!res.ok) {
-        toast((await res.json()).detail || 'Could not build the report.');
-        return;
-      }
-      const format = res.headers.get('X-Report-Format') || 'pdf';
+  function openReport() {
+    if (state.reportJob) window.open('/api/jobs/' + state.reportJob + '/report', '_blank');
+  }
+
+  async function downloadBundle() {
+    if (!state.reportJob) return;
+    const button = $('#btnBundle');
+    button.disabled = true;
+    $('#bundleProgress').hidden = false;
+    $('#bundleMsg').textContent = 'Starting…';
+    const res = await fetch('/api/jobs/' + state.reportJob + '/bundle', { method: 'POST' });
+    if (!res.ok) {
+      toast((await res.json()).detail || 'Could not start.');
+      button.disabled = false; $('#bundleProgress').hidden = true;
+      return;
+    }
+    pollBundle();
+  }
+
+  async function pollBundle() {
+    const res = await fetch('/api/jobs/' + state.reportJob + '/bundle');
+    if (!res.ok) { $('#bundleProgress').hidden = true; $('#btnBundle').disabled = false; return; }
+
+    // Ready, and the zip itself is the response rather than a status.
+    if ((res.headers.get('Content-Type') || '').includes('zip')) {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      // Open it rather than only downloading — a report you cannot see is not
-      // done. It is already written to outputs/reports/, so forcing a download
-      // on top of this would just leave a second copy of the same document.
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      if (format === 'pdf') {
-        toast('Report opened — saved as outputs/reports/report.pdf');
-      } else {
-        // Rendering needs a Chromium-family browser; say so instead of
-        // quietly handing over a different file type than the one promised.
-        toast('No browser found to render a PDF — opened the HTML instead. '
-              + (res.headers.get('X-Report-Pdf-Error') || ''));
-      }
-    } finally {
-      button.disabled = false; button.textContent = 'Generate report';
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (res.headers.get('Content-Disposition') || '')
+        .replace(/.*filename="([^"]+)".*/, '$1') || 'design-sheets.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      $('#bundleFill').style.width = '100%';
+      $('#bundleMsg').textContent = 'Downloaded.';
+      $('#btnBundle').disabled = false;
+      return;
     }
+
+    const job = await res.json();
+    if (job.bundle_status === 'failed') {
+      toast(job.bundle_error || 'Could not build the sheets.');
+      $('#bundleProgress').hidden = true; $('#btnBundle').disabled = false;
+      return;
+    }
+    const frac = job.bundle_total ? job.bundle_done / job.bundle_total : 0;
+    $('#bundleFill').style.width = (100 * frac).toFixed(1) + '%';
+    $('#bundleMsg').textContent = job.bundle_message || 'Working…';
+    setTimeout(pollBundle, 900);
   }
 
   async function attachToRun(id) {
@@ -816,7 +827,7 @@ const App = (() => {
     if (!res.ok) { toast('That run is no longer held.'); return; }
     const job = await res.json();
     state.jobId = id;
-    if (job.status === 'done') { await loadResults(); return; }
+    if (job.status === 'done') { showReportCard(job); await loadResults(); return; }
     if (job.status === 'running' || job.status === 'queued') {
       Charts.resetLive();
       $('#emptyState').hidden = true;
@@ -848,7 +859,6 @@ const App = (() => {
     $('#panels').hidden = false;
     renderProfiles();
     renderPanels();
-    refreshRuns();
   }
 
   /* -------------------------------------------------------- the results */

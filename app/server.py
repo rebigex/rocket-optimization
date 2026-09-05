@@ -30,7 +30,6 @@ from rocketopt.spec import (EFFORT_LEVELS, OPTIMISABLE_METRICS, ORDERING_MODES,
                             RunSpec)
 from rocketopt.units import KG_M2S_PER_LB_IN2S, M_PER_IN
 
-from rocketopt.report import ReportRun, build_report
 
 from .jobs import JobRegistry
 
@@ -443,7 +442,8 @@ def start_run(payload: SpecPayload) -> JSONResponse:
     if problems:
         raise HTTPException(400, "; ".join(problems))
     job = jobs.start(spec, motor, predicted=_estimate(spec)["seconds"],
-                     shape=_shape(spec))
+                     shape=_shape(spec), reports_dir=ROOT / "reports",
+                     outputs_dir=ROOT / "outputs")
     return JSONResponse(job.status_dict())
 
 
@@ -453,45 +453,59 @@ def list_jobs() -> JSONResponse:
     return JSONResponse(jobs.listing())
 
 
-class ReportRequest(BaseModel):
-    job_ids: list
-    title: Optional[str] = None
+@app.get("/api/jobs/{job_id}/report")
+def get_report(job_id: str) -> Response:
+    """The report written when this run finished.
 
-
-@app.post("/api/report")
-def make_report(payload: ReportRequest) -> Response:
-    """Builds the technical report for one or more finished runs."""
-    motor = _require_motor()
-    chosen = []
-    for job_id in payload.job_ids:
-        job = jobs.get(job_id)
-        if job is None:
-            raise HTTPException(404, "Run {} is no longer held.".format(job_id))
-        if job.status != "done" or job.result is None:
-            raise HTTPException(409, "Run {} is {}.".format(job_id, job.status))
-        chosen.append(job)
-    # Sections read in the order the runs were made, not the order the picker
-    # happened to list them.
-    chosen.sort(key=lambda j: j.started_at)
-    selected = [ReportRun(label=j.label, result=j.result.to_dict(), spec=j.spec)
-                for j in chosen]
-    if not selected:
-        raise HTTPException(400, "Pick at least one finished run.")
-
-    out = ROOT / "outputs" / "reports"
-    files = build_report(selected, motor, out, title=payload.title)
-    if files.pdf is not None:
+    There is no endpoint to build one: a run writes its own, so asking for a
+    report is only ever asking for a file that already exists.
+    """
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Run {} is no longer held.".format(job_id))
+    if job.report is None or not job.report.exists():
+        raise HTTPException(
+            404, job.report_error or "No report was written for that run.")
+    if job.report.suffix == ".pdf":
         return Response(
-            content=files.pdf.read_bytes(), media_type="application/pdf",
+            content=job.report.read_bytes(), media_type="application/pdf",
             headers={"Content-Disposition": 'inline; filename="motor-report.pdf"',
                      "X-Report-Format": "pdf"})
-    # Nothing to render with. The HTML is complete, so hand that over rather
-    # than nothing, and say in a header why it is not the PDF that was asked for.
     return Response(
-        content=files.html.read_text(), media_type="text/html",
+        content=job.report.read_text(), media_type="text/html",
         headers={"Content-Disposition": 'inline; filename="motor-report.html"',
                  "X-Report-Format": "html",
-                 "X-Report-Pdf-Error": files.pdf_error[:200]})
+                 "X-Report-Pdf-Error": job.report_error[:200]})
+
+
+@app.post("/api/jobs/{job_id}/bundle")
+def start_bundle(job_id: str) -> JSONResponse:
+    """Begins rendering one sheet per design on this run's trade-off curve."""
+    motor = _require_motor()
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Run {} is no longer held.".format(job_id))
+    if job.status != "done" or job.result is None:
+        raise HTTPException(409, "Run {} is {}.".format(job_id, job.status))
+    if not job.result.designs:
+        raise HTTPException(
+            409, "That run found no legal designs, so there are no sheets to write.")
+    jobs.start_bundle(job, motor, ROOT / "reports")
+    return JSONResponse(job.status_dict())
+
+
+@app.get("/api/jobs/{job_id}/bundle")
+def bundle_status(job_id: str) -> Response:
+    """The zip, once it is ready; its progress until then."""
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Run {} is no longer held.".format(job_id))
+    if job.bundle_status != "ready" or job.bundle is None:
+        return JSONResponse(job.status_dict())
+    return Response(
+        content=job.bundle.read_bytes(), media_type="application/zip",
+        headers={"Content-Disposition":
+                 'attachment; filename="{}"'.format(job.bundle.name)})
 
 
 @app.get("/api/jobs/{job_id}")

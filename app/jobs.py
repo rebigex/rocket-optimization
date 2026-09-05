@@ -18,8 +18,12 @@ import time
 import traceback
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional
 
+from rocketopt.bundle import build_bundle
+from rocketopt.outputs import write_run
+from rocketopt.report import ReportRun, build_report
 from rocketopt.runner import RunResult, run
 from rocketopt.spec import RunSpec
 
@@ -65,11 +69,31 @@ class Job:
     #: registry can learn how far off the estimate runs for this shape.
     predicted: float = 0.0
     shape: str = ""
+    #: The report for this run, written as soon as it finishes. Every run gets
+    #: one -- a run you have to remember to write up is a run you will not.
+    report: Optional[Path] = None
+    report_error: str = ""
+    #: A zip holding one sheet per design on the trade-off curve. Built only on
+    #: request -- it is a browser launch per design, so it is not something to
+    #: do behind every run.
+    bundle: Optional[Path] = None
+    bundle_status: str = "idle"      # idle | building | ready | failed
+    bundle_done: int = 0
+    bundle_total: int = 0
+    bundle_message: str = ""
+    bundle_error: str = ""
     _cancel: threading.Event = field(default_factory=threading.Event)
 
     def status_dict(self) -> Dict:
         elapsed = (self.finished_at or time.time()) - self.started_at
         return {
+            "report": self.report.name if self.report else "",
+            "report_error": self.report_error,
+            "bundle_status": self.bundle_status,
+            "bundle_done": self.bundle_done,
+            "bundle_total": self.bundle_total,
+            "bundle_message": self.bundle_message,
+            "bundle_error": self.bundle_error,
             "id": self.id,
             "status": self.status,
             "stage": self.stage,
@@ -116,6 +140,45 @@ class JobRegistry:
         blended = observed if previous is None else 0.5 * previous + 0.5 * observed
         self._factors[shape] = float(min(max(blended, 0.2), 5.0))
 
+    def start_bundle(self, job: Job, base_motor: Dict, out_dir: Path) -> bool:
+        """Renders one sheet per design, in the background.
+
+        Sixty designs is sixty browser launches, so this cannot happen inside
+        the request that asks for it.
+        """
+        if job.result is None or job.status != "done":
+            return False
+        if job.bundle_status == "building":
+            return True
+
+        job.bundle_status = "building"
+        job.bundle_done, job.bundle_total = 0, len(job.result.designs)
+        job.bundle_message = "Starting"
+        job.bundle_error = ""
+
+        def progress(done: int, total: int, message: str) -> None:
+            job.bundle_done, job.bundle_total = done, total
+            job.bundle_message = message
+
+        def target() -> None:
+            try:
+                out = out_dir / "design-sheets-{}.zip".format(job.id)
+                job.bundle = build_bundle(
+                    ReportRun(label=job.label, result=job.result.to_dict(),
+                              spec=job.spec),
+                    base_motor, out, on_progress=progress)
+                job.bundle_status = "ready"
+                job.bundle_message = "Ready"
+            except Exception as exc:
+                job.bundle_status = "failed"
+                job.bundle_error = str(exc)
+                job.bundle_message = "Could not build the sheets"
+                traceback.print_exc()
+
+        threading.Thread(target=target, name="bundle-" + job.id,
+                         daemon=True).start()
+        return True
+
     def get(self, job_id: str) -> Optional[Job]:
         with self._lock:
             return self._jobs.get(job_id)
@@ -137,7 +200,9 @@ class JobRegistry:
         return True
 
     def start(self, spec: RunSpec, base_motor: Dict, workers: Optional[int] = None,
-              predicted: float = 0.0, shape: str = "") -> Job:
+              predicted: float = 0.0, shape: str = "",
+              reports_dir: Optional[Path] = None,
+              outputs_dir: Optional[Path] = None) -> Job:
         job = Job(id=uuid.uuid4().hex[:12], spec=spec,
                   label=describe_spec(spec))
         job.predicted = float(predicted)
@@ -174,6 +239,30 @@ class JobRegistry:
             try:
                 job.result = run(spec, base_motor, on_progress=progress,
                                  workers=workers, on_telemetry=telemetry)
+                # Every run produces its report, without being asked. Failing to
+                # write it must not lose the run that has already been done.
+                if reports_dir is not None or outputs_dir is not None:
+                    job.stage, job.fraction = "report", 0.97
+                    job.message = "Writing the report"
+                    try:
+                        # outputs/ mirrors the last run only, so it is emptied
+                        # first and the figures below land in the fresh folder.
+                        figures_dir = None
+                        if outputs_dir is not None:
+                            from rocketopt.runner import build_space
+                            write_run(job.result, base_motor,
+                                      build_space(spec, base_motor), outputs_dir)
+                            figures_dir = Path(outputs_dir) / "figures"
+                        if reports_dir is not None:
+                            files = build_report(
+                                [ReportRun(label=job.label,
+                                           result=job.result.to_dict(), spec=spec)],
+                                base_motor, reports_dir, figures_dir=figures_dir)
+                            job.report = files.path
+                            job.report_error = files.pdf_error
+                    except Exception as exc:
+                        job.report_error = str(exc)
+                        traceback.print_exc()
                 job.status, job.stage, job.fraction = "done", "done", 1.0
                 job.message = "Finished"
                 # How long this kind of run really takes, for the next
