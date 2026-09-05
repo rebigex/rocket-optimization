@@ -117,8 +117,8 @@ Uncertainty is declared against the hardware and the propellant, once, in the ra
 never needs to know what is being optimised, which is why it needs no per-run setup.
 
 **Several searches, merged.** NSGA-II is stochastic and offers no guarantee it found the
-global front. Running the identical configuration three times with different seeds put
-best initial thrust 6.4% apart, and 17–62% of each run's front was strictly beaten by
+global front. Measured during development, on one motor: running the identical
+configuration three times with different seeds put best initial thrust 6.4% apart, and 17–62% of each run's front was strictly beaten by
 another run's. So a run now splits its budget across independent searches and reports the
 non-dominated set of everything they found. That is not just insurance, it is cheaper:
 three 4,800-simulation searches merged reached 6,984 N where a single 14,400-simulation
@@ -183,8 +183,6 @@ scripts/setup_env.sh                          # venv, deps, openMotor, tests
 .venv/bin/python app.py                       # the app — everything below, driven
 
 .venv/bin/python scripts/verify_ordering.py   # prove the core-sorting assumption
-.venv/bin/python scripts/run_envelope.py      # optimise inside a fixed envelope
-.venv/bin/python scripts/big_run.py           # the 100,000-simulation, 8-seed study
 .venv/bin/python -m pytest tests/ -q
 ```
 

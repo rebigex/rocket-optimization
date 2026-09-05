@@ -444,13 +444,12 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--rule);
 <section>
   <h2>Running it without the app</h2>
   <div class="prose">
-  <p>Everything the app does is a library call. The scripts are the reproducible path.</p>
+  <p>Everything the app does is a library call: <code>rocketopt.runner.run</code> takes a
+  spec and a motor and hands back verified designs, and <code>rocketopt.report</code> and
+  <code>rocketopt.bundle</code> turn those into the PDFs. The app is a thin layer over
+  them, so anything it does can be scripted.</p>
   </div>
 <pre>scripts/verify_ordering.py     check the core-sorting assumption against the simulator
-scripts/build_dataset.py       sample and simulate a design set
-scripts/train_surrogate.py     fit and score the surrogate models
-scripts/run_envelope.py        optimise inside a fixed operating envelope
-scripts/big_run.py             the 100,000-simulation, 8-seed study
 .venv/bin/python -m pytest tests/ -q</pre>
   <div class="note warn">
     <span class="lbl">If a run comes back empty</span>
