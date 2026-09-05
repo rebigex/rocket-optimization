@@ -158,7 +158,15 @@ def build(root: Path = ROOT) -> Path:
     """Creates the environment. Returns the interpreter to run the app with."""
     python = venv_python(root)
 
-    if not python.exists():
+    # A .venv left over from an attempt on an unsupported Python is worse than
+    # none: its interpreter is the wrong version, and installing into it fails
+    # exactly the way it failed the first time. Replace it rather than reuse it.
+    existing = version_of(python) if python.exists() else None
+    if existing and not supported(existing):
+        print("  replacing .venv, which was built with Python {}.{}".format(*existing))
+        shutil.rmtree(root / ".venv", ignore_errors=True)
+
+    if not venv_python(root).exists():
         base = find_supported_python()
         if base is None:
             raise SystemExit("No Python this dependency set supports.")
@@ -166,6 +174,7 @@ def build(root: Path = ROOT) -> Path:
             print("  using {} for the environment ({}.{} is out of range)".format(
                 " ".join(base), *sys.version_info[:2]))
         _run(base + ["-m", "venv", str(root / ".venv")], what="creating .venv")
+        python = venv_python(root)
 
     _run([str(python), "-m", "pip", "install", "--upgrade", "--quiet", "pip"],
          what="upgrading pip")
