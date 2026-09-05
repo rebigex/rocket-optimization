@@ -8,9 +8,15 @@ headlessly. Point it at a `.ric`, say which dimensions may move and what you wan
 of, and it returns motors you can open in openMotor and machine to the numbers.
 
 ```bash
-scripts/setup_env.sh              # venv, deps, openMotor, tests
-.venv/bin/python app.py           # opens http://localhost:8420
+python3 app.py                    # opens http://localhost:8420
 ```
+
+That is the whole install. The first run offers to build the environment —
+a `.venv` here, the packages in `requirements.txt`, and a pinned clone of
+openMotor — then starts itself inside it. Your system Python is left alone.
+It needs Python 3.9+, `git`, and a C compiler for openMotor's native extension
+(`xcode-select --install` on macOS, `build-essential` on Debian). To build it
+without being asked: `scripts/setup_env.sh`, or `python3 bootstrap.py --yes`.
 
 ![The optimizer](docs/screenshot.png)
 
@@ -179,8 +185,7 @@ afterwards cannot mislabel a result, and `?job=<id>` reopens it.
 ## Pipeline
 
 ```bash
-scripts/setup_env.sh                          # venv, deps, openMotor, tests
-.venv/bin/python app.py                       # the app — everything below, driven
+python3 app.py                                # builds the environment, then runs
 
 .venv/bin/python scripts/verify_ordering.py   # prove the core-sorting assumption
 .venv/bin/python -m pytest tests/ -q
@@ -234,6 +239,7 @@ src/rocketopt/
   report.py      the technical report, derived entirely from the runs
   report_style.py  the report stylesheet, kept as data
   plotting.py    figures for the static report
+bootstrap.py     builds the environment on a machine that has none of it
 motor/           the .ric you want optimised; ships empty, never committed
 tests/           machining grid, frozen dimensions, ordering rules
 docs/            the field guide -- documentation, not generated artefacts

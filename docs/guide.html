@@ -174,7 +174,15 @@ footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--rule);
 <section>
   <h2>Start it</h2>
 <pre>cd "Rocket Optimization"
-.venv/bin/python app.py          <span style="color:var(--ink-3)"># opens http://localhost:8420</span></pre>
+python3 app.py                   <span style="color:var(--ink-3)"># opens http://localhost:8420</span></pre>
+  <div class="prose">
+  <p>That is the whole install. The first time, it says it needs to build an environment
+  and waits for you to agree: a <code>.venv</code> in this folder, the packages in
+  <code>requirements.txt</code>, and a pinned clone of openMotor. Nothing outside the
+  folder is touched and your system Python is left alone. It does need Python 3.9 or
+  newer, <code>git</code>, and a C compiler for openMotor&rsquo;s native extension &mdash;
+  <code>xcode-select --install</code> on macOS, <code>build-essential</code> on Debian.</p>
+  </div>
   <div class="prose">
   <p>It loads whatever <code>.ric</code> is in <code>motor/</code> on start &mdash; drop
   yours in and it is the one that opens, whatever it is called. The folder starts empty
