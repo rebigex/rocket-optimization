@@ -23,8 +23,11 @@ openMotor at the verification timestep with all safety margins removed.
 ---
 
 Whatever `.ric` sits in `motor/` is the motor that gets optimised — drop yours in and
-it is the one that loads, whatever it is called. The one there now is six 5.00 × 6.00 in
-BATES grains, uninhibited ends, Mad River Blue propellant.
+it is the one that loads, whatever it is called. The folder ships empty and the app does
+nothing until you put something in it: the motor is yours, and nobody else's belongs in
+this repository. There is no `.ric` here at all — the tests build the motor they need
+(`python tests/sample_motor.py motor/sample.ric` writes one, if you want something to
+try it on).
 
 ## What is optimised
 
@@ -233,7 +236,7 @@ src/rocketopt/
   report.py      the technical report, derived entirely from the runs
   report_style.py  the report stylesheet, kept as data
   plotting.py    figures for the static report
-motor/           the .ric you want optimised -- whatever is here is the motor
+motor/           the .ric you want optimised; ships empty, never committed
 tests/           machining grid, frozen dimensions, ordering rules
 docs/            the field guide -- documentation, not generated artefacts
 reports/         ships empty; your reports land here, and are never committed

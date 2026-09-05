@@ -1,6 +1,4 @@
-# Pinned to what this project was developed and verified against.
-# openMotor itself is not listed: it is GPLv3 and is cloned by scripts/setup_env.sh
-# rather than redistributed here. See NOTICE.md.
+# your computer will explode if u try to run this code without installing these dependencies
 numpy<2
 scipy==1.13.1
 scikit-fmm==2025.1.29

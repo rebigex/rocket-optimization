@@ -12,13 +12,17 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from rocketopt.ric import motor_path, load_ric
+from rocketopt.ric import load_ric
+from tests import sample_motor
 from rocketopt.runner import default_spec
 from rocketopt.sizing import _multiset, _steps, size_space
 from rocketopt.spec import OrderingSpec
 from rocketopt.units import M_PER_IN as IN
 
-MOTOR = motor_path(ROOT)
+#: Built, not shipped. The repository contains no .ric at all: motor/ is
+#: yours and is not committed, and a test that read whatever motor happened
+#: to be loaded was not reproducible anyway -- its numbers moved with the file.
+MOTOR = sample_motor.path(ROOT)
 
 
 @pytest.fixture(scope="module")
@@ -139,11 +143,15 @@ def test_closed_form_peak_kn_tracks_the_simulator():
     base = load_ric(MOTOR)
     diameter = base["grains"][0]["properties"]["diameter"]
     length = base["grains"][0]["properties"]["length"]
+    throat_0 = base["nozzle"]["throat"]
     rng = np.random.default_rng(3)
     ratios = []
+    # Scaled to the motor rather than fixed in inches: a core wider than the
+    # grain is not a motor, so hardcoded ranges silently sampled nothing at all
+    # on any motor but the one they were written for.
     for _ in range(6):
-        cores = np.sort(rng.uniform(0.8 * IN, 3.8 * IN, 6))
-        throat = rng.uniform(1.4 * IN, 2.4 * IN)
+        cores = np.sort(rng.uniform(0.2 * diameter, 0.8 * diameter, len(base["grains"])))
+        throat = rng.uniform(0.7 * throat_0, 1.6 * throat_0)
         motor = clone(base)
         for grain, core in zip(motor["grains"], cores):
             grain["properties"]["coreDiameter"] = float(core)

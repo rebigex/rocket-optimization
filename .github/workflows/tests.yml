@@ -38,6 +38,10 @@ jobs:
         run: python -m pytest tests/ -q
 
       # The claim the whole design space rests on, checked against the simulator
-      # rather than taken on trust.
+      # rather than taken on trust. The scripts run on whatever motor is in
+      # motor/, and the repository ships no motor at all -- it is the user's,
+      # not the tool's -- so CI builds the sample one first.
       - name: Verify the core-ordering assumption
-        run: python scripts/verify_ordering.py
+        run: |
+          python tests/sample_motor.py motor/sample.ric
+          python scripts/verify_ordering.py

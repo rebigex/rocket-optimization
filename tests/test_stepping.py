@@ -16,12 +16,16 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from rocketopt.design import DesignSpace, SpaceConfig
 from rocketopt.optimize import Objective, scale_constraints
-from rocketopt.ric import motor_path, load_ric
+from rocketopt.ric import load_ric
+from tests import sample_motor
 from rocketopt.spec import ConstraintSpec, OrderingSpec, VariableSpec
 from rocketopt.units import parse_number, round_up_to_step, snap
 
 IN = 0.0254
-MOTOR = motor_path(ROOT)
+#: Built, not shipped. The repository contains no .ric at all: motor/ is
+#: yours and is not committed, and a test that read whatever motor happened
+#: to be loaded was not reproducible anyway -- its numbers moved with the file.
+MOTOR = sample_motor.path(ROOT)
 
 
 @pytest.fixture(scope="module")

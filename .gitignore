@@ -7,6 +7,11 @@ outputs/
 reports/*
 !reports/.gitkeep
 
+# The motor is yours. The repository is the tool, not anybody's design, so the
+# folder ships empty and whatever you drop in stays on your machine.
+motor/*
+!motor/.gitkeep
+
 # openMotor is GPLv3 and is cloned by scripts/setup_env.sh, not redistributed here.
 vendor/
 
