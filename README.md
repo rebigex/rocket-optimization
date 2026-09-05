@@ -22,8 +22,9 @@ openMotor at the verification timestep with all safety margins removed.
 
 ---
 
-The motor in `Data/Open Motor Data/Current.ric` is the working example throughout:
-six 5.00 × 6.00 in BATES grains, uninhibited ends, Mad River Blue propellant.
+Whatever `.ric` sits in `motor/` is the motor that gets optimised — drop yours in and
+it is the one that loads, whatever it is called. The one there now is six 5.00 × 6.00 in
+BATES grains, uninhibited ends, Mad River Blue propellant.
 
 ## What is optimised
 
@@ -232,6 +233,7 @@ src/rocketopt/
   report.py      the technical report, derived entirely from the runs
   report_style.py  the report stylesheet, kept as data
   plotting.py    figures for the static report
+motor/           the .ric you want optimised -- whatever is here is the motor
 tests/           machining grid, frozen dimensions, ordering rules
 docs/            the field guide -- documentation, not generated artefacts
 reports/         ships empty; your reports land here, and are never committed

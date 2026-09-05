@@ -75,9 +75,10 @@ for _np_type in (np.float32, np.int32, np.int16, np.bool_):
     )
 
 
-#: Where a motor lives. Whatever .ric sits here is the motor being optimised --
-#: no file name is special, and nothing in this project names one.
-MOTOR_DIR = ("Data", "Open Motor Data")
+#: Where the motor lives. Whatever .ric sits here is the motor being optimised --
+#: no file name is special, and nothing in this project names one. Singular
+#: because one motor is optimised at a time, which is what motor_path assumes.
+MOTOR_DIR = ("motor",)
 
 
 def motor_path(root: Path) -> Path:
