@@ -179,9 +179,19 @@ python3 app.py                   <span style="color:var(--ink-3)"># opens http:/
   <p>That is the whole install. The first time, it says it needs to build an environment
   and waits for you to agree: a <code>.venv</code> in this folder, the packages in
   <code>requirements.txt</code>, and a pinned clone of openMotor. Nothing outside the
-  folder is touched and your system Python is left alone. It does need Python 3.9 or
-  newer, <code>git</code>, and a C compiler for openMotor&rsquo;s native extension &mdash;
-  <code>xcode-select --install</code> on macOS, <code>build-essential</code> on Debian.</p>
+  folder is touched and your system Python is left alone. It does need
+  <strong>Python 3.9 to 3.12</strong>, <code>git</code>, and a C compiler for
+  openMotor&rsquo;s native extension &mdash; <code>xcode-select --install</code> on macOS,
+  <code>build-essential</code> on Debian.</p>
+  <div class="note warn">
+    <span class="lbl">Why 3.12 and not newer</span>
+    <p>The pinned numpy, scipy and scikit-image publish wheels up to 3.12 only. PyPI does
+    not record that as an upper bound, so on 3.13 pip does not refuse &mdash; it tries to
+    compile numpy from source, which needs a C and Fortran toolchain and fails on most
+    machines with a meson error that never mentions your Python version. Setup checks the
+    range up front, and uses a supported interpreter if you have one installed alongside
+    the newer one.</p>
+  </div>
   </div>
   <div class="prose">
   <p>It loads whatever <code>.ric</code> is in <code>motor/</code> on start &mdash; drop

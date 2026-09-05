@@ -34,7 +34,63 @@ OPENMOTOR_COMMIT = "0dfb3f1dd4f843499c7f71dc85a3dfde5dd15c6a"
 REQUIRED = ("fastapi", "uvicorn", "numpy", "pandas", "pymoo", "sklearn",
             "matplotlib", "plotly", "motorlib.motor")
 
+#: The pinned dependency set publishes wheels for these versions and no others
+#: -- numpy 1.26, scipy 1.13 and scikit-image 0.24 all stop at cp312. PyPI
+#: metadata says only ">=3.9", with no upper bound, so on a newer Python pip
+#: does not refuse: it tries to compile numpy from source, which fails on a
+#: machine without a full C/Fortran toolchain and buries the reason in a meson
+#: log. Refusing up front, with the version to install, is the whole point of
+#: this check.
 MIN_PYTHON = (3, 9)
+MAX_PYTHON = (3, 12)
+
+#: Tried in order when the interpreter running this is out of range. The
+#: Windows launcher is asked for specific versions; elsewhere the names are.
+CANDIDATE_PYTHONS = ["python3.12", "python3.11", "python3.10", "python3.9"]
+WINDOWS_LAUNCHER_VERSIONS = ["3.12", "3.11", "3.10", "3.9"]
+
+
+def version_of(python) -> Optional[tuple]:
+    """The (major, minor) that interpreter reports, or None if it will not run."""
+    try:
+        out = subprocess.run(
+            [str(python), "-c", "import sys; print(sys.version_info[0], sys.version_info[1])"],
+            capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    try:
+        return tuple(int(x) for x in out.stdout.split())
+    except ValueError:
+        return None
+
+
+def supported(version: Optional[tuple]) -> bool:
+    return bool(version) and MIN_PYTHON <= version <= MAX_PYTHON
+
+
+def find_supported_python() -> Optional[List[str]]:
+    """A command on this machine whose Python the pinned wheels cover.
+
+    Returns the command as a list, because the Windows launcher takes the
+    version as an argument rather than being a differently named executable.
+    """
+    if supported(sys.version_info[:2]):
+        return [sys.executable]
+    for name in CANDIDATE_PYTHONS:
+        found = shutil.which(name)
+        if found and supported(version_of(found)):
+            return [found]
+    launcher = shutil.which("py")
+    if launcher:
+        for wanted in WINDOWS_LAUNCHER_VERSIONS:
+            probe = subprocess.run(
+                [launcher, "-" + wanted, "-c", "import sys; print(sys.version_info[1])"],
+                capture_output=True, text=True)
+            if probe.returncode == 0:
+                return [launcher, "-" + wanted]
+    return None
 
 
 def venv_python(root: Path = ROOT) -> Path:
@@ -57,10 +113,21 @@ def can_import(python: Path, modules=REQUIRED) -> bool:
 def missing_prerequisites() -> List[str]:
     """Things that have to be installed by hand, with how to do it."""
     problems = []
-    if sys.version_info < MIN_PYTHON:
+    if find_supported_python() is None:
         problems.append(
-            "Python {}.{} or newer (this is {}.{}).".format(
-                MIN_PYTHON[0], MIN_PYTHON[1], *sys.version_info[:2]))
+            "Python between {}.{} and {}.{} -- this is {}.{}, and no other was "
+            "found on this machine.\n"
+            "    The pinned versions of numpy, scipy and scikit-image only "
+            "publish wheels up to {}.{};\n"
+            "    on anything newer pip tries to compile them from source, which "
+            "needs a full C and\n"
+            "    Fortran toolchain and is what the numpy/meson error you may have "
+            "just seen was.\n"
+            "    Install {}.{} from https://www.python.org/downloads/ and run "
+            "this again.".format(
+                MIN_PYTHON[0], MIN_PYTHON[1], MAX_PYTHON[0], MAX_PYTHON[1],
+                sys.version_info[0], sys.version_info[1],
+                MAX_PYTHON[0], MAX_PYTHON[1], MAX_PYTHON[0], MAX_PYTHON[1]))
     if shutil.which("git") is None:
         problems.append(
             "git, to fetch openMotor. macOS: xcode-select --install. "
@@ -92,13 +159,29 @@ def build(root: Path = ROOT) -> Path:
     python = venv_python(root)
 
     if not python.exists():
-        _run([sys.executable, "-m", "venv", str(root / ".venv")],
-             what="creating .venv")
+        base = find_supported_python()
+        if base is None:
+            raise SystemExit("No Python this dependency set supports.")
+        if base != [sys.executable]:
+            print("  using {} for the environment ({}.{} is out of range)".format(
+                " ".join(base), *sys.version_info[:2]))
+        _run(base + ["-m", "venv", str(root / ".venv")], what="creating .venv")
 
     _run([str(python), "-m", "pip", "install", "--upgrade", "--quiet", "pip"],
          what="upgrading pip")
-    _run([str(python), "-m", "pip", "install", "--quiet", "-r",
-          str(root / "requirements.txt")], what="installing dependencies")
+    try:
+        _run([str(python), "-m", "pip", "install", "--quiet", "-r",
+              str(root / "requirements.txt")], what="installing dependencies")
+    except subprocess.CalledProcessError:
+        built = version_of(python)
+        raise SystemExit(
+            "\nInstalling the dependencies failed. The output above says why.\n"
+            "If it mentions building numpy, scipy or scikit-image from source, "
+            "the\nenvironment is on Python {}, and the pinned versions only ship "
+            "wheels up to\n{}.{}. Delete .venv, install Python {}.{}, and run this "
+            "again.".format(
+                "{}.{}".format(*built) if built else "an unsupported version",
+                MAX_PYTHON[0], MAX_PYTHON[1], MAX_PYTHON[0], MAX_PYTHON[1]))
 
     vendor = root / "vendor" / "openMotor"
     if not (vendor / ".git").exists():
